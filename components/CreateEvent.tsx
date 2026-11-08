@@ -1,152 +1,192 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "./supabase";
 
-type EventRecord = {
-  id: string;
-  title: string;
-  event_date: string;
-  event_time: string;
-  location: string | null;
-  host_name: string;
-  description: string | null;
-  slug: string;
-};
+export default function CreateEvent() {
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("18:00");
+  const [location, setLocation] = useState("");
+  const [host, setHost] = useState("");
+  const [description, setDescription] = useState("");
 
-export default function EventDetails({ slug }: { slug: string }) {
-  const [event, setEvent] = useState<EventRecord | null>(null);
-  const [status, setStatus] = useState("Loading invitation…");
-  const [name, setName] = useState("");
-  const [choice, setChoice] = useState("yes");
-  const [guestCount, setGuestCount] = useState("1");
-  const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [eventLink, setEventLink] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (slug === "demo") {
-      setStatus("This is a sample invitation. Create your own event to publish a live invite.");
-      return;
-    }
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage("");
+    setCopied(false);
 
     if (!supabase) {
-      setStatus("The event service is not connected yet.");
-      return;
-    }
-
-    supabase
-      .from("events")
-      .select("*")
-      .eq("slug", slug)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          setStatus("We couldn't find this event.");
-        } else {
-          setEvent(data as EventRecord);
-          setStatus("");
-        }
-      });
-  }, [slug]);
-
-  async function rsvp(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!supabase || !event || busy) return;
-
-    const count = Number(guestCount);
-
-    if (!Number.isInteger(count) || count < 1 || count > 50) {
-      setStatus("Please enter a number between 1 and 50.");
+      setMessage("Event service is not connected. Please check your Cloudflare environment variables.");
       return;
     }
 
     setBusy(true);
-    setStatus("");
 
-    const { error } = await supabase.from("rsvps").insert({
-      event_id: event.id,
-      guest_name: name.trim(),
-      response: choice,
-      guest_count: count,
-    });
+    const slug = `${title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 35)}-${Math.random().toString(36).slice(2, 7)}`;
+
+    const { error } = await supabase
+      .from("events")
+      .insert({
+        title,
+        slug,
+        event_date: date,
+        event_time: time,
+        location,
+        host_name: host,
+        description,
+      });
 
     setBusy(false);
 
     if (error) {
-      setStatus(error.message);
-    } else {
-      setSaved(true);
+      setMessage(error.message);
+      return;
+    }
+
+    const link = `${window.location.origin}/event/?slug=${encodeURIComponent(slug)}`;
+
+    setEventLink(link);
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(eventLink);
+      setCopied(true);
+    } catch {
+      setMessage("Unable to copy automatically. Please select and copy the link.");
     }
   }
 
+  if (eventLink) {
+    return (
+      <section className="form-shell">
+        <div className="eyebrow">✳ YOUR EVENT IS READY</div>
+
+        <h1>You're all <em>set!</em></h1>
+
+        <p className="form-intro">
+          Your event has been created successfully. Share this invitation
+          link with your friends and family.
+        </p>
+
+        <label>YOUR INVITATION LINK</label>
+
+        <input
+          readOnly
+          value={eventLink}
+          onFocus={(e) => e.currentTarget.select()}
+        />
+
+        <button
+          type="button"
+          className="primary"
+          onClick={copyLink}
+        >
+          {copied ? "✓ Link Copied!" : "Copy Invitation Link"}
+        </button>
+
+        {message && <p className="notice">{message}</p>}
+
+        <p className="notice">
+          Your guests can open this link and submit their RSVPs.
+        </p>
+
+        <a className="secondary" href="/">
+          ← Back to TGathr
+        </a>
+      </section>
+    );
+  }
+
   return (
-    <section className="invite">
-      <div className="eyebrow">✳ YOU'RE INVITED</div>
+    <section className="form-shell">
+      <div className="eyebrow">LET'S GET EVERYONE TOGETHER</div>
 
-      {event ? (
-        <>
-          <h1>{event.title}</h1>
-          <p className="lead">Hosted by {event.host_name}</p>
+      <h1>Create your <em>event.</em></h1>
 
-          <div className="invite-details">
-            <p>📅 {event.event_date} · {event.event_time}</p>
-            {event.location && <p>📍 {event.location}</p>}
-            {event.description && <p>{event.description}</p>}
-          </div>
+      <p className="form-intro">
+        A few details, one shareable link, and you're all set.
+      </p>
 
-          {saved ? (
-            <p className="notice">Thanks! Your RSVP is saved.</p>
-          ) : (
-            <form onSubmit={rsvp}>
-              <label>
-                Your name
-                <input
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </label>
+      <form onSubmit={submit}>
+        <label>
+          What's the occasion?
+          <input
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Birthday dinner"
+          />
+        </label>
 
-              <label>
-                Can you make it?
-                <select
-                  value={choice}
-                  onChange={(e) => setChoice(e.target.value)}
-                >
-                  <option value="yes">I'm in!</option>
-                  <option value="maybe">Maybe</option>
-                  <option value="no">Can't make it</option>
-                </select>
-              </label>
+        <div className="two">
+          <label>
+            Date
+            <input
+              required
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </label>
 
-              <label>
-                How many people are attending, including you?
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  step="1"
-                  required
-                  value={guestCount}
-                  onChange={(e) => setGuestCount(e.target.value)}
-                />
-              </label>
+          <label>
+            Time
+            <input
+              required
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+            />
+          </label>
+        </div>
 
-              <button className="primary" disabled={busy}>
-                {busy ? "Sending…" : "Send RSVP"}
-              </button>
+        <label>
+          Where is it?
+          <input
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Address or venue"
+          />
+        </label>
 
-              {status && <p className="notice">{status}</p>}
-            </form>
-          )}
-        </>
-      ) : (
-        <h1>{status}</h1>
-      )}
+        <label>
+          Your name
+          <input
+            required
+            value={host}
+            onChange={(e) => setHost(e.target.value)}
+            placeholder="Host name"
+          />
+        </label>
 
-      <a href="/" className="secondary">← Made with TGathr</a>
+        <label>
+          A little more info
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="What should guests know?"
+          />
+        </label>
+
+        <button className="primary" disabled={busy}>
+          {busy ? "Creating..." : "Create event ↗"}
+        </button>
+
+        {message && <p className="notice">{message}</p>}
+      </form>
     </section>
   );
 }
