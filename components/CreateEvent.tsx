@@ -12,7 +12,7 @@ export default function CreateEvent() {
     const { error } = await supabase.from("events").insert({ title, slug, event_date: date, event_time: time, location, host_name: host, description }).select().single();
     setBusy(false);
     if (error) { setMessage(error.message); return; }
-    setMessage(`Event created! Share this link: ${window.location.origin}/event/${slug}/`);
+    setMessage(`Event created! Share this link: ${window.location.origin}/event/?slug=${encodeURIComponent(slug)}`);
   }
   return <section className="form-shell"><div className="eyebrow">LET'S GET EVERYONE TOGETHER</div><h1>Create your <em>event.</em></h1><p className="form-intro">A few details, one shareable link, and you're all set.</p><form onSubmit={submit}>
     <label>What's the occasion?<input required value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Birthday dinner"/></label>
