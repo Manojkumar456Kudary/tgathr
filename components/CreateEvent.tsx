@@ -1,26 +1,152 @@
+
 "use client";
-import { useState } from "react";
+
+import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 
-export default function CreateEvent() {
-  const [title,setTitle]=useState(""); const [date,setDate]=useState(""); const [time,setTime]=useState("18:00"); const [location,setLocation]=useState(""); const [host,setHost]=useState(""); const [description,setDescription]=useState(""); const [busy,setBusy]=useState(false); const [message,setMessage]=useState("");
-  async function submit(e: React.FormEvent) {
-    e.preventDefault(); setMessage("");
-    if (!supabase) { setMessage("Connect your Supabase project first by adding the two NEXT_PUBLIC_SUPABASE environment variables in Cloudflare."); return; }
+type EventRecord = {
+  id: string;
+  title: string;
+  event_date: string;
+  event_time: string;
+  location: string | null;
+  host_name: string;
+  description: string | null;
+  slug: string;
+};
+
+export default function EventDetails({ slug }: { slug: string }) {
+  const [event, setEvent] = useState<EventRecord | null>(null);
+  const [status, setStatus] = useState("Loading invitation…");
+  const [name, setName] = useState("");
+  const [choice, setChoice] = useState("yes");
+  const [guestCount, setGuestCount] = useState("1");
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (slug === "demo") {
+      setStatus("This is a sample invitation. Create your own event to publish a live invite.");
+      return;
+    }
+
+    if (!supabase) {
+      setStatus("The event service is not connected yet.");
+      return;
+    }
+
+    supabase
+      .from("events")
+      .select("*")
+      .eq("slug", slug)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          setStatus("We couldn't find this event.");
+        } else {
+          setEvent(data as EventRecord);
+          setStatus("");
+        }
+      });
+  }, [slug]);
+
+  async function rsvp(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!supabase || !event || busy) return;
+
+    const count = Number(guestCount);
+
+    if (!Number.isInteger(count) || count < 1 || count > 50) {
+      setStatus("Please enter a number between 1 and 50.");
+      return;
+    }
+
     setBusy(true);
-    const slug = `${title.toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,35)}-${Math.random().toString(36).slice(2,7)}`;
-    const { error } = await supabase.from("events").insert({ title, slug, event_date: date, event_time: time, location, host_name: host, description }).select().single();
+    setStatus("");
+
+    const { error } = await supabase.from("rsvps").insert({
+      event_id: event.id,
+      guest_name: name.trim(),
+      response: choice,
+      guest_count: count,
+    });
+
     setBusy(false);
-    if (error) { setMessage(error.message); return; }
-    setMessage(`Event created! Share this link: ${window.location.origin}/event/?slug=${encodeURIComponent(slug)}`);
+
+    if (error) {
+      setStatus(error.message);
+    } else {
+      setSaved(true);
+    }
   }
-  return <section className="form-shell"><div className="eyebrow">LET'S GET EVERYONE TOGETHER</div><h1>Create your <em>event.</em></h1><p className="form-intro">A few details, one shareable link, and you're all set.</p><form onSubmit={submit}>
-    <label>What's the occasion?<input required value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Birthday dinner"/></label>
-    <div className="two"><label>Date<input required type="date" value={date} onChange={e=>setDate(e.target.value)}/></label><label>Time<input required type="time" value={time} onChange={e=>setTime(e.target.value)}/></label></div>
-    <label>Where is it?<input value={location} onChange={e=>setLocation(e.target.value)} placeholder="Address or venue"/></label>
-    <label>Your name<input required value={host} onChange={e=>setHost(e.target.value)} placeholder="Host name"/></label>
-    <label>A little more info<textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="What should guests know?"/></label>
-    <button className="primary" disabled={busy}>{busy?"Creating…":"Create event ↗"}</button>
-    {message && <p className="notice">{message}</p>}
-  </form></section>;
+
+  return (
+    <section className="invite">
+      <div className="eyebrow">✳ YOU'RE INVITED</div>
+
+      {event ? (
+        <>
+          <h1>{event.title}</h1>
+          <p className="lead">Hosted by {event.host_name}</p>
+
+          <div className="invite-details">
+            <p>📅 {event.event_date} · {event.event_time}</p>
+            {event.location && <p>📍 {event.location}</p>}
+            {event.description && <p>{event.description}</p>}
+          </div>
+
+          {saved ? (
+            <p className="notice">Thanks! Your RSVP is saved.</p>
+          ) : (
+            <form onSubmit={rsvp}>
+              <label>
+                Your name
+                <input
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+
+              <label>
+                Can you make it?
+                <select
+                  value={choice}
+                  onChange={(e) => setChoice(e.target.value)}
+                >
+                  <option value="yes">I'm in!</option>
+                  <option value="maybe">Maybe</option>
+                  <option value="no">Can't make it</option>
+                </select>
+              </label>
+
+              <label>
+                How many people are attending, including you?
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  step="1"
+                  required
+                  value={guestCount}
+                  onChange={(e) => setGuestCount(e.target.value)}
+                />
+              </label>
+
+              <button className="primary" disabled={busy}>
+                {busy ? "Sending…" : "Send RSVP"}
+              </button>
+
+              {status && <p className="notice">{status}</p>}
+            </form>
+          )}
+        </>
+      ) : (
+        <h1>{status}</h1>
+      )}
+
+      <a href="/" className="secondary">← Made with TGathr</a>
+    </section>
+  );
 }
