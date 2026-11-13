@@ -65,6 +65,36 @@ export default function LoginPage() {
     }
   }
 
+  async function sendResetEmail() {
+    if (!supabase) {
+      setMessage("Authentication service is not connected.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setMessage("Enter your email address first.");
+      return;
+    }
+
+    setBusy(true);
+    setMessage("");
+
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      {
+        redirectTo: `${window.location.origin}/reset-password/`,
+      }
+    );
+
+    setBusy(false);
+
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setMessage("If an account exists for this email, a password reset link has been sent.");
+    }
+  }
+
   return (
     <main className="subpage">
       <header className="nav wrap">
@@ -112,6 +142,24 @@ export default function LoginPage() {
           </button>
         </form>
 
+        <p style={{ textAlign: "right", marginTop: "12px" }}>
+          <button
+            type="button"
+            onClick={sendResetEmail}
+            disabled={busy}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              textDecoration: "underline",
+              color: "inherit",
+            }}
+          >
+            Forgot password?
+          </button>
+        </p>
+
         <div className="form-intro" style={{ textAlign: "center" }}>
           Or
         </div>
@@ -122,7 +170,7 @@ export default function LoginPage() {
           disabled={busy}
           onClick={sendLoginLink}
         >
-          {busy ? "Sending..." : "Continue with email link"}
+          {busy ? "Please wait..." : "Continue with email link"}
         </button>
 
         {message && <p className="notice">{message}</p>}
@@ -130,4 +178,3 @@ export default function LoginPage() {
     </main>
   );
 }
-
