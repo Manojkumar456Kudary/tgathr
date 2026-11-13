@@ -84,7 +84,7 @@ export default function SetPasswordPage() {
       return;
     }
 
-    window.location.href = "/create/";
+    window.location.href = "/";
   }
 
   return (
