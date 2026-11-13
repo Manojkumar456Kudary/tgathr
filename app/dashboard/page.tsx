@@ -36,13 +36,15 @@ export default function DashboardPage() {
         return;
       }
 
-      const { data: { user }, error: authError } =
-        await supabase.auth.getUser();
+      const { data: { session }, error: authError } =
+  await supabase.auth.getSession();
 
-      if (authError || !user) {
-        window.location.href = "/login/";
-        return;
-      }
+if (authError || !session?.user) {
+  window.location.href = "/login/";
+  return;
+}
+
+const user = session.user;
 
       const { data: eventData, error: eventError } = await supabase
         .from("events")
