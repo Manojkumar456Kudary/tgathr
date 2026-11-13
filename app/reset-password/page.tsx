@@ -50,7 +50,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    window.location.href = "/create/";
+    window.location.href = "/";
   }
 
   return (
