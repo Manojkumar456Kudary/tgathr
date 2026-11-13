@@ -27,9 +27,16 @@ export default function CreateEvent() {
       return;
     }
 
-    setBusy(true);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-    const slug = `${title
+if (userError || !user) {
+  window.location.href = "/login/";
+  return;
+}
+
+setBusy(true);
+
+const slug = `${title
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, "-")
