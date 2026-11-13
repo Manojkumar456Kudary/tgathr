@@ -23,38 +23,41 @@ export default function CreateEvent() {
     setCopied(false);
 
     if (!supabase) {
-      setMessage("Event service is not connected. Please check your Cloudflare environment variables.");
+      setMessage(
+        "Event service is not connected. Please check your Cloudflare environment variables."
+      );
       return;
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-if (userError || !user) {
-  window.location.href = "/login/";
-  return;
-}
+    if (userError || !user) {
+      window.location.href = "/login/";
+      return;
+    }
 
-setBusy(true);
+    setBusy(true);
 
-const slug = `${title
+    const slug = `${title
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 35)}-${Math.random().toString(36).slice(2, 7)}`;
 
-    const { error } = await supabase
-      .from("events")
-      .insert({
-  title,
-  slug,
-  event_date: date,
-  event_time: time,
-  location,
-  host_name: host,
-  description,
-  owner_id: user.id,
-});
+    const { error } = await supabase.from("events").insert({
+      title,
+      slug,
+      event_date: date,
+      event_time: time,
+      location,
+      host_name: host,
+      description,
+      owner_id: user.id,
+    });
 
     setBusy(false);
 
@@ -63,7 +66,9 @@ const slug = `${title
       return;
     }
 
-    const link = `${window.location.origin}/event/?slug=${encodeURIComponent(slug)}`;
+    const link = `${window.location.origin}/event/?slug=${encodeURIComponent(
+      slug
+    )}`;
 
     setEventLink(link);
   }
@@ -73,7 +78,9 @@ const slug = `${title
       await navigator.clipboard.writeText(eventLink);
       setCopied(true);
     } catch {
-      setMessage("Unable to copy automatically. Please select and copy the link.");
+      setMessage(
+        "Unable to copy automatically. Please select and copy the link."
+      );
     }
   }
 
@@ -110,6 +117,10 @@ const slug = `${title
         <p className="notice">
           Your guests can open this link and submit their RSVPs.
         </p>
+
+        <a className="primary" href="/dashboard/">
+          Go to My Dashboard →
+        </a>
 
         <a className="secondary" href="/">
           ← Back to TGathr
