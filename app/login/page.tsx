@@ -23,7 +23,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: `${window.location.origin}/create/`,
+        emailRedirectTo: `${window.location.origin}/set-password/`,
       },
     });
 
@@ -32,7 +32,9 @@ export default function LoginPage() {
     if (error) {
       setMessage(error.message);
     } else {
-      setMessage("Check your email! We've sent you a secure sign-in link.");
+      setMessage(
+        "Check your email! Click the secure link to sign in and continue setting up your account."
+      );
     }
   }
 
@@ -48,11 +50,12 @@ export default function LoginPage() {
       <section className="form-shell">
         <div className="eyebrow">WELCOME TO TGATHR</div>
 
-        <h1>Sign in to <em>continue.</em></h1>
+        <h1>Join TGathr or <em>sign in.</em></h1>
 
         <p className="form-intro">
-          Enter your email address. We'll send you a secure sign-in link.
-          No password required.
+          Enter your email address. We'll send you a secure
+          verification link. New users can create their password
+          after confirming their email.
         </p>
 
         <form onSubmit={sendLoginLink}>
@@ -68,7 +71,7 @@ export default function LoginPage() {
           </label>
 
           <button className="primary" disabled={busy}>
-            {busy ? "Sending..." : "Send sign-in link →"}
+            {busy ? "Sending..." : "Continue with email →"}
           </button>
 
           {message && <p className="notice">{message}</p>}
