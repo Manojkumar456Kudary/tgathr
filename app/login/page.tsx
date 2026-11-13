@@ -6,14 +6,43 @@ import { supabase } from "@/components/supabase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function sendLoginLink(e: React.FormEvent) {
+  async function signInWithPassword(e: React.FormEvent) {
     e.preventDefault();
 
     if (!supabase) {
       setMessage("Authentication service is not connected.");
+      return;
+    }
+
+    setBusy(true);
+    setMessage("");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    setBusy(false);
+
+    if (error) {
+      setMessage(error.message);
+    } else {
+      window.location.href = "/create/";
+    }
+  }
+
+  async function sendLoginLink() {
+    if (!supabase) {
+      setMessage("Authentication service is not connected.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setMessage("Please enter your email address first.");
       return;
     }
 
@@ -32,9 +61,7 @@ export default function LoginPage() {
     if (error) {
       setMessage(error.message);
     } else {
-      setMessage(
-        "Check your email! Click the secure link to sign in and continue setting up your account."
-      );
+      setMessage("Check your email for a secure sign-in link.");
     }
   }
 
@@ -50,15 +77,14 @@ export default function LoginPage() {
       <section className="form-shell">
         <div className="eyebrow">WELCOME TO TGATHR</div>
 
-        <h1>Join TGathr or <em>sign in.</em></h1>
+        <h1>Welcome <em>back.</em></h1>
 
         <p className="form-intro">
-          Enter your email address. We'll send you a secure
-          verification link. New users can create their password
-          after confirming their email.
+          Sign in with your email and password, or use
+          a secure email link.
         </p>
 
-        <form onSubmit={sendLoginLink}>
+        <form onSubmit={signInWithPassword}>
           <label>
             Your email address
             <input
@@ -70,14 +96,37 @@ export default function LoginPage() {
             />
           </label>
 
-          <button className="primary" disabled={busy}>
-            {busy ? "Sending..." : "Continue with email →"}
-          </button>
+          <label>
+            Password
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+            />
+          </label>
 
-          {message && <p className="notice">{message}</p>}
+          <button className="primary" disabled={busy}>
+            {busy ? "Signing in..." : "Sign in →"}
+          </button>
         </form>
+
+        <div className="form-intro" style={{ textAlign: "center" }}>
+          Or
+        </div>
+
+        <button
+          type="button"
+          className="primary"
+          disabled={busy}
+          onClick={sendLoginLink}
+        >
+          {busy ? "Sending..." : "Continue with email link"}
+        </button>
+
+        {message && <p className="notice">{message}</p>}
       </section>
     </main>
   );
 }
-
