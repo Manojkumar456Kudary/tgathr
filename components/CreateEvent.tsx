@@ -46,14 +46,15 @@ const slug = `${title
     const { error } = await supabase
       .from("events")
       .insert({
-        title,
-        slug,
-        event_date: date,
-        event_time: time,
-        location,
-        host_name: host,
-        description,
-      });
+  title,
+  slug,
+  event_date: date,
+  event_time: time,
+  location,
+  host_name: host,
+  description,
+  owner_id: user.id,
+});
 
     setBusy(false);
 
