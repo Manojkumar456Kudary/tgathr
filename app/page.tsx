@@ -52,7 +52,7 @@ export default function Home() {
 
         {!checkingSession && loggedIn && (
           <Link className="nav-link" href="/dashboard/">
-            My Dashboard
+            My Profile
           </Link>
         )}
 
@@ -90,7 +90,7 @@ export default function Home() {
 
             {loggedIn ? (
               <Link className="secondary" href="/dashboard/">
-                My Dashboard →
+                My Profile →
               </Link>
             ) : (
               <a className="secondary" href="#how">
