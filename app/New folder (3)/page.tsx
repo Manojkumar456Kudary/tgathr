@@ -1,20 +1,212 @@
-import Link from "next/link";
 
-const examples = [
-  { emoji: "🥂", type: "DINNER PARTY", title: "Friday night, good people", date: "FRI · 7:00 PM", color: "peach" },
-  { emoji: "🎂", type: "BIRTHDAY", title: "Another trip around the sun", date: "SAT · 6:30 PM", color: "lavender" },
-  { emoji: "🎲", type: "GAME NIGHT", title: "Cards, snacks & chaos", date: "SUN · 5:00 PM", color: "mint" }
-];
+"use client";
 
-export default function Home() {
-  return <main>
-    <nav className="nav wrap"><Link className="brand" href="/">t<span>g</span>athr<span className="dot">.</span></Link><a className="nav-link" href="#how">How it works</a><Link className="nav-cta" href="/create/">Create an event <span>↗</span></Link></nav>
-    <section className="hero wrap">
-      <div className="hero-copy"><div className="eyebrow"><span className="spark">✳</span> GOOD THINGS HAPPEN TOGETHER</div><h1>Make plans.<br/><em>Make memories.</em></h1><p className="lead">The easiest way to bring your favorite people together. Create an invite, share the link, and let the good times happen.</p><div className="hero-actions"><Link className="primary" href="/create/">Create your event <span>↗</span></Link><a className="secondary" href="#how">See how it works ↓</a></div><div className="social-proof"><div className="avatars"><i>J</i><i>M</i><i>A</i><i>+</i></div><span>Less group chat. More get-togethers.</span></div></div>
-      <div className="hero-art"><div className="sun"></div><div className="note note-back"><small>YOU'RE INVITED</small><strong>Good times<br/>ahead ✨</strong><span>Save the date</span></div><div className="note note-front"><div className="note-top"><span>✳ TGATHR</span><span>№ 001</span></div><div className="note-emoji">🍊</div><small>LET'S GET TOGETHER</small><h2>A little<br/>something<br/><em>special.</em></h2><div className="note-bottom"><span>GOOD PEOPLE · GOOD VIBES</span><span>↗</span></div></div><div className="scribble">the more<br/>the merrier!</div></div>
-    </section>
-    <section className="examples wrap"><div className="section-head"><div><div className="eyebrow">A REASON TO GET TOGETHER</div><h2>Whatever the occasion.</h2></div><p>Big milestones, little moments,<br/>and everything in between.</p></div><div className="event-grid">{examples.map((e)=><article className={`event-card ${e.color}`} key={e.title}><div className="event-emoji">{e.emoji}</div><div className="event-type">{e.type}</div><h3>{e.title}</h3><div className="event-date">{e.date}</div></article>)}</div></section>
-    <section className="how wrap" id="how"><div className="eyebrow">THREE LITTLE STEPS</div><h2>Plans made <em>simple.</em></h2><div className="steps"><div><b>01</b><h3>Create</h3><p>Add the details and give your gathering a little personality.</p></div><div><b>02</b><h3>Share</h3><p>Send one link to your group chat. No app download needed.</p></div><div><b>03</b><h3>Celebrate</h3><p>See who's coming and spend less time coordinating.</p></div></div><Link className="primary" href="/create/">Let's make a plan <span>↗</span></Link></section>
-    <footer className="footer wrap"><Link className="brand" href="/">tgathr<span className="dot">.</span></Link><span>Bring your people together.</span><span>Made for getting together ♥</span></footer>
-  </main>;
+import { useEffect, useState } from "react";
+import { supabase } from "@/components/supabase";
+
+type EventRecord = {
+  id: string;
+  title: string;
+  slug: string;
+  event_date: string;
+  event_time: string;
+  location: string | null;
+  owner_id: string;
+};
+
+type RSVPRecord = {
+  id: string;
+  event_id: string;
+  guest_name: string;
+  response: "yes" | "maybe" | "no";
+  guest_count: number;
+};
+
+export default function DashboardPage() {
+  const [events, setEvents] = useState<EventRecord[]>([]);
+  const [rsvps, setRsvps] = useState<RSVPRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    async function loadDashboard() {
+      if (!supabase) {
+        setMessage("The event service is not connected.");
+        setLoading(false);
+        return;
+      }
+
+      const { data: { user }, error: authError } =
+        await supabase.auth.getUser();
+
+      if (authError || !user) {
+        window.location.href = "/login/";
+        return;
+      }
+
+      const { data: eventData, error: eventError } = await supabase
+        .from("events")
+        .select("*")
+        .eq("owner_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (eventError) {
+        setMessage(eventError.message);
+        setLoading(false);
+        return;
+      }
+
+      const myEvents = (eventData || []) as EventRecord[];
+      setEvents(myEvents);
+
+      if (myEvents.length > 0) {
+        const eventIds = myEvents.map((event) => event.id);
+
+        const { data: rsvpData, error: rsvpError } = await supabase
+          .from("rsvps")
+          .select("*")
+          .in("event_id", eventIds)
+          .order("created_at", { ascending: false });
+
+        if (rsvpError) {
+          setMessage(rsvpError.message);
+        } else {
+          setRsvps((rsvpData || []) as RSVPRecord[]);
+        }
+      }
+
+      setLoading(false);
+    }
+
+    loadDashboard();
+  }, []);
+
+  async function logout() {
+    if (!supabase) return;
+
+    await supabase.auth.signOut();
+    window.location.href = "/login/";
+  }
+
+  if (loading) {
+    return (
+      <main className="subpage">
+        <section className="form-shell">
+          <h1>Loading your dashboard...</h1>
+        </section>
+      </main>
+    );
+  }
+
+  const totalYes = rsvps.filter((r) => r.response === "yes").length;
+  const totalMaybe = rsvps.filter((r) => r.response === "maybe").length;
+  const totalNo = rsvps.filter((r) => r.response === "no").length;
+
+  const attendingPeople = rsvps
+    .filter((r) => r.response === "yes")
+    .reduce((sum, r) => sum + Number(r.guest_count || 1), 0);
+
+  return (
+    <main className="subpage">
+      <header className="nav wrap">
+        <a className="brand" href="/">
+          tgathr<span className="dot">.</span>
+        </a>
+        <button className="secondary" onClick={logout}>
+          Sign out
+        </button>
+      </header>
+
+      <section className="form-shell">
+        <div className="eyebrow">YOUR PRIVATE EVENT SPACE</div>
+        <h1>Your <em>dashboard.</em></h1>
+        <p className="form-intro">
+          Track responses from guests invited to your events.
+        </p>
+
+        {message && <p className="notice">{message}</p>}
+
+        <div className="invite-details">
+          <p>Events created: <strong>{events.length}</strong></p>
+          <p>Yes: <strong>{totalYes}</strong></p>
+          <p>Maybe: <strong>{totalMaybe}</strong></p>
+          <p>No: <strong>{totalNo}</strong></p>
+          <p>Expected attendees: <strong>{attendingPeople}</strong></p>
+        </div>
+
+        {events.length === 0 ? (
+          <div>
+            <p>You haven't created any events yet.</p>
+            <a className="primary" href="/create/">
+              Create an event →
+            </a>
+          </div>
+        ) : (
+          events.map((event) => {
+            const eventRsvps = rsvps.filter(
+              (rsvp) => rsvp.event_id === event.id
+            );
+
+            const yes = eventRsvps.filter(
+              (rsvp) => rsvp.response === "yes"
+            );
+
+            const maybe = eventRsvps.filter(
+              (rsvp) => rsvp.response === "maybe"
+            );
+
+            const no = eventRsvps.filter(
+              (rsvp) => rsvp.response === "no"
+            );
+
+            const people = yes.reduce(
+              (sum, rsvp) => sum + Number(rsvp.guest_count || 1),
+              0
+            );
+
+            const invitationLink =
+              `${window.location.origin}/event/?slug=${encodeURIComponent(event.slug)}`;
+
+            return (
+              <div className="invite-details" key={event.id}>
+                <h2>{event.title}</h2>
+                <p>📅 {event.event_date} · {event.event_time}</p>
+                {event.location && <p>📍 {event.location}</p>}
+
+                <p>
+                  Yes: <strong>{yes.length}</strong> ·
+                  Maybe: <strong>{maybe.length}</strong> ·
+                  No: <strong>{no.length}</strong>
+                </p>
+                <p>People attending: <strong>{people}</strong></p>
+
+                <label>Invitation link</label>
+                <input readOnly value={invitationLink} />
+
+                <h3>Guest responses</h3>
+
+                {eventRsvps.length === 0 ? (
+                  <p>No one has responded yet.</p>
+                ) : (
+                  eventRsvps.map((rsvp) => (
+                    <p key={rsvp.id}>
+                      <strong>{rsvp.guest_name}</strong>
+                      {" — "}
+                      {rsvp.response.toUpperCase()}
+                      {" — "}
+                      {rsvp.guest_count} {rsvp.guest_count === 1 ? "person" : "people"}
+                    </p>
+                  ))
+                )}
+              </div>
+            );
+          })
+        )}
+
+        <a className="secondary" href="/create/">
+          + Create another event
+        </a>
+      </section>
+    </main>
+  );
 }
