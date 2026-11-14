@@ -1357,3 +1357,21 @@ textarea { min-height: 90px; resize: vertical; }
   }
 }
 
+/* ABOUT SECTION - FOUNDER DETAILS */
+
+.about-founder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 25px;
+}
+
+.about-founder strong {
+  display: block;
+}
+
+.about-founder span {
+  display: block;
+  margin-top: 2px;
+}
