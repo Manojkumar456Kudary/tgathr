@@ -40,10 +40,7 @@ export default function CreateEvent() {
     ]);
   }
 
-  function updateQuestion(
-    id: string,
-    changes: Partial<QuestionDraft>
-  ) {
+  function updateQuestion(id: string, changes: Partial<QuestionDraft>) {
     setQuestions((current) =>
       current.map((question) =>
         question.id === id ? { ...question, ...changes } : question
@@ -122,7 +119,6 @@ export default function CreateEvent() {
       return;
     }
 
-    // Validate custom questions before creating the event.
     const preparedQuestions: QuestionDraft[] = [];
 
     for (const question of questions) {
@@ -144,7 +140,10 @@ export default function CreateEvent() {
         return;
       }
 
-      if (new Set(options.map((option) => option.toLowerCase())).size !== options.length) {
+      if (
+        new Set(options.map((option) => option.toLowerCase())).size !==
+        options.length
+      ) {
         setMessage(
           `Please remove duplicate options from "${questionText}".`
         );
@@ -167,7 +166,6 @@ export default function CreateEvent() {
       .replace(/^-|-$/g, "")
       .slice(0, 35)}-${Math.random().toString(36).slice(2, 7)}`;
 
-    // Create the event first.
     const { data: eventData, error: eventError } = await supabase
       .from("events")
       .insert({
@@ -189,7 +187,6 @@ export default function CreateEvent() {
       return;
     }
 
-    // Save each custom question and its options.
     for (let index = 0; index < preparedQuestions.length; index++) {
       const question = preparedQuestions[index];
 
@@ -273,11 +270,7 @@ export default function CreateEvent() {
           onFocus={(e) => e.currentTarget.select()}
         />
 
-        <button
-          type="button"
-          className="primary"
-          onClick={copyLink}
-        >
+        <button type="button" className="primary" onClick={copyLink}>
           {copied ? "✓ Link Copied!" : "Copy Invitation Link"}
         </button>
 
@@ -369,132 +362,172 @@ export default function CreateEvent() {
           />
         </label>
 
-        <div className="invite-details">
-          <h2>Custom RSVP Questions</h2>
-
-          <p className="form-intro">
-            Ask your guests anything you need to know. Each attendee will
-            answer these questions individually.
-          </p>
+        <div className="question-builder">
+          <div className="question-builder-header">
+            <span className="eyebrow">MAKE IT PERSONAL</span>
+            <h2>Guest questionnaire</h2>
+            <p>
+              Collect the details you need from your guests when they RSVP.
+              Each attendee answers individually.
+            </p>
+          </div>
 
           {questions.map((question, index) => (
-            <div
-              key={question.id}
-              className="invite-details"
-            >
-              <h3>Question {index + 1}</h3>
+            <div key={question.id} className="question-card">
+              <div className="question-card-top">
+                <span className="question-number">
+                  QUESTION {String(index + 1).padStart(2, "0")}
+                </span>
 
-              <label>
-                Question
+                <button
+                  type="button"
+                  className="question-remove-icon"
+                  onClick={() => removeQuestion(question.id)}
+                  aria-label="Remove question"
+                  title="Remove question"
+                >
+                  ×
+                </button>
+              </div>
+
+              <label className="question-field-label">
+                Your question
                 <input
                   required
+                  className="question-text-input"
                   value={question.text}
                   onChange={(e) =>
                     updateQuestion(question.id, {
                       text: e.target.value,
                     })
                   }
-                  placeholder="e.g. Food Preference"
+                  placeholder="e.g. What food do you prefer?"
                 />
               </label>
 
-              <label>
-                Answer type
-                <select
-                  value={question.type}
-                  onChange={(e) =>
-                    updateQuestion(question.id, {
-                      type: e.target.value as QuestionDraft["type"],
-                    })
-                  }
-                >
-                  <option value="single_choice">Single choice</option>
-                  <option value="multiple_choice">Multiple choice</option>
-                </select>
-              </label>
-
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={question.required}
-                  onChange={(e) =>
-                    updateQuestion(question.id, {
-                      required: e.target.checked,
-                    })
-                  }
-                />
-                Required question
-              </label>
-
-              <p><strong>Answer options</strong></p>
-
-              {question.options.map((option, optionIndex) => (
-                <div
-                  key={optionIndex}
-                  style={{
-                    display: "flex",
-                    gap: "8px",
-                    alignItems: "center",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <input
-                    required
-                    value={option}
+              <div className="question-settings">
+                <label className="question-field-label">
+                  Answer format
+                  <select
+                    value={question.type}
                     onChange={(e) =>
-                      updateOption(
-                        question.id,
-                        optionIndex,
-                        e.target.value
-                      )
+                      updateQuestion(question.id, {
+                        type: e.target.value as QuestionDraft["type"],
+                      })
                     }
-                    placeholder={`Option ${optionIndex + 1}`}
-                  />
+                  >
+                    <option value="single_choice">Single choice</option>
+                    <option value="multiple_choice">Multiple choice</option>
+                  </select>
+                </label>
 
-                  {question.options.length > 2 && (
+                <div className="question-field-label">
+                  Guest response
+                  <div className="requirement-pills">
                     <button
                       type="button"
-                      className="secondary"
+                      className={`requirement-pill ${
+                        question.required ? "active" : ""
+                      }`}
+                      aria-pressed={question.required}
                       onClick={() =>
-                        removeOption(question.id, optionIndex)
+                        updateQuestion(question.id, { required: true })
                       }
                     >
-                      Remove
+                      Required
                     </button>
-                  )}
+
+                    <button
+                      type="button"
+                      className={`requirement-pill ${
+                        !question.required ? "active" : ""
+                      }`}
+                      aria-pressed={!question.required}
+                      onClick={() =>
+                        updateQuestion(question.id, { required: false })
+                      }
+                    >
+                      Optional
+                    </button>
+                  </div>
                 </div>
-              ))}
+              </div>
 
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => addOption(question.id)}
-              >
-                + Add another option
-              </button>
+              <div className="question-options-section">
+                <div className="question-options-heading">
+                  <span>Answer options</span>
+                  <span>{question.options.length} options</span>
+                </div>
 
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => removeQuestion(question.id)}
-              >
-                Remove this question
-              </button>
+                {question.options.map((option, optionIndex) => (
+                  <div key={optionIndex} className="question-option-row">
+                    <span className="question-option-dot" />
+
+                    <input
+                      required
+                      value={option}
+                      onChange={(e) =>
+                        updateOption(
+                          question.id,
+                          optionIndex,
+                          e.target.value
+                        )
+                      }
+                      placeholder={`Option ${optionIndex + 1}`}
+                    />
+
+                    {question.options.length > 2 && (
+                      <button
+                        type="button"
+                        className="question-option-remove"
+                        onClick={() =>
+                          removeOption(question.id, optionIndex)
+                        }
+                        aria-label={`Remove option ${optionIndex + 1}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className="question-add-option"
+                  onClick={() => addOption(question.id)}
+                >
+                  + Add another option
+                </button>
+              </div>
+
+              <div className="question-card-footer">
+                <span>
+                  {question.required
+                    ? "Guests must answer this question"
+                    : "Guests can skip this question"}
+                </span>
+
+                <button
+                  type="button"
+                  className="question-remove-text"
+                  onClick={() => removeQuestion(question.id)}
+                >
+                  Remove question
+                </button>
+              </div>
             </div>
           ))}
 
           <button
             type="button"
-            className="secondary"
+            className="question-add-main"
             onClick={addQuestion}
           >
-            + Add custom question
+            <span className="question-add-symbol">+</span>
+            <span>
+              <strong>Add a question</strong>
+              <small>Create another question for your guests</small>
+            </span>
           </button>
         </div>
 
