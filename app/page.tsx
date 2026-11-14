@@ -218,9 +218,10 @@ export default function Home() {
           </p>
 
           <div className="about-founder">
-            <strong>Manoj Kumar Kudary</strong>
-            <span>Founder, TGathr</span>
-          </div>
+  <strong>Manoj Kumar Kudary</strong>
+  <br />
+  <span>Founder, TGathr</span>
+</div>
         </div>
       </section>
 
