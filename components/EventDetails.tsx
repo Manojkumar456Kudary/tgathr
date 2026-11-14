@@ -1,444 +1,542 @@
 
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { supabase } from "./supabase";
 
-type EventRecord = {
+type QuestionDraft = {
   id: string;
-  title: string;
-  event_date: string;
-  event_time: string;
-  location: string | null;
-  host_name: string;
-  description: string | null;
-  slug: string;
+  text: string;
+  type: "single_choice" | "multiple_choice";
+  required: boolean;
+  options: string[];
 };
 
-type QuestionOption = {
-  id: string;
-  option_text: string;
-};
+export default function CreateEvent() {
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("18:00");
+  const [location, setLocation] = useState("");
+  const [host, setHost] = useState("");
+  const [description, setDescription] = useState("");
 
-type EventQuestion = {
-  id: string;
-  question_text: string;
-  question_type: "single_choice" | "multiple_choice";
-  is_required: boolean;
-  options: QuestionOption[];
-};
+  const [questions, setQuestions] = useState<QuestionDraft[]>([]);
 
-type Attendee = {
-  id: string;
-  name: string;
-};
-
-export default function EventDetails({ slug }: { slug: string }) {
-  const [event, setEvent] = useState<EventRecord | null>(null);
-  const [questions, setQuestions] = useState<EventQuestion[]>([]);
-  const [attendees, setAttendees] = useState<Attendee[]>([
-    { id: "attendee-1", name: "" },
-  ]);
-  const [answers, setAnswers] = useState<
-    Record<string, Record<string, string[]>>
-  >({});
-  const [choice, setChoice] = useState("yes");
-  const [status, setStatus] = useState("Loading invitation…");
-  const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [eventLink, setEventLink] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    async function loadEvent() {
-      if (slug === "demo") {
-        setStatus(
-          "This is a sample invitation. Create your own event to publish a live invite."
-        );
-        return;
-      }
+  function addQuestion() {
+    setQuestions((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        text: "",
+        type: "single_choice",
+        required: false,
+        options: ["", ""],
+      },
+    ]);
+  }
 
-      if (!supabase) {
-        setStatus("The event service is not connected yet.");
-        return;
-      }
-
-      const { data: eventData, error: eventError } = await supabase
-        .from("events")
-        .select("*")
-        .eq("slug", slug)
-        .single();
-
-      if (eventError || !eventData) {
-        setStatus("We couldn't find this event.");
-        return;
-      }
-
-      setEvent(eventData as EventRecord);
-
-      const { data: questionData, error: questionError } = await supabase
-        .from("event_questions")
-        .select("id, question_text, question_type, is_required, position")
-        .eq("event_id", eventData.id)
-        .order("position");
-
-      if (questionError) {
-        setStatus("Unable to load this event's RSVP questions.");
-        return;
-      }
-
-      if (questionData && questionData.length > 0) {
-        const questionIds = questionData.map((q) => q.id);
-
-        const { data: optionData, error: optionError } = await supabase
-          .from("event_question_options")
-          .select("id, question_id, option_text, position")
-          .in("question_id", questionIds)
-          .order("position");
-
-        if (optionError) {
-          setStatus("Unable to load the RSVP answer options.");
-          return;
-        }
-
-        const formattedQuestions: EventQuestion[] = questionData.map((q) => ({
-          id: q.id,
-          question_text: q.question_text,
-          question_type: q.question_type,
-          is_required: q.is_required,
-          options: (optionData || [])
-            .filter((option) => option.question_id === q.id)
-            .map((option) => ({
-              id: option.id,
-              option_text: option.option_text,
-            })),
-        }));
-
-        setQuestions(formattedQuestions);
-      }
-
-      setStatus("");
-    }
-
-    loadEvent();
-  }, [slug]);
-
-  function updateAttendeeName(id: string, value: string) {
-    setAttendees((current) =>
-      current.map((attendee) =>
-        attendee.id === id ? { ...attendee, name: value } : attendee
+  function updateQuestion(id: string, changes: Partial<QuestionDraft>) {
+    setQuestions((current) =>
+      current.map((question) =>
+        question.id === id ? { ...question, ...changes } : question
       )
     );
   }
 
-  function addAttendee() {
-    if (attendees.length >= 50) {
-      setStatus("You can add up to 50 attendees.");
-      return;
-    }
-
-    setStatus("");
-    setAttendees((current) => [
-      ...current,
-      { id: crypto.randomUUID(), name: "" },
-    ]);
-  }
-
-  function removeAttendee(id: string) {
-    if (attendees.length <= 1) return;
-
-    setAttendees((current) =>
-      current.filter((attendee) => attendee.id !== id)
+  function removeQuestion(id: string) {
+    setQuestions((current) =>
+      current.filter((question) => question.id !== id)
     );
-
-    setAnswers((current) => {
-      const updated = { ...current };
-      delete updated[id];
-      return updated;
-    });
   }
 
-  function updateAnswer(
-    attendeeId: string,
+  function updateOption(
     questionId: string,
-    optionId: string,
-    multiple: boolean,
-    checked: boolean
+    optionIndex: number,
+    value: string
   ) {
-    setAnswers((current) => {
-      const attendeeAnswers = { ...(current[attendeeId] || {}) };
-      const selected = attendeeAnswers[questionId] || [];
+    setQuestions((current) =>
+      current.map((question) => {
+        if (question.id !== questionId) return question;
 
-      if (multiple) {
-        attendeeAnswers[questionId] = checked
-          ? [...selected, optionId]
-          : selected.filter((id) => id !== optionId);
-      } else {
-        attendeeAnswers[questionId] = [optionId];
-      }
+        const options = [...question.options];
+        options[optionIndex] = value;
 
-      return {
-        ...current,
-        [attendeeId]: attendeeAnswers,
-      };
-    });
+        return { ...question, options };
+      })
+    );
   }
 
-  async function rsvp(e: FormEvent<HTMLFormElement>) {
+  function addOption(questionId: string) {
+    setQuestions((current) =>
+      current.map((question) =>
+        question.id === questionId
+          ? { ...question, options: [...question.options, ""] }
+          : question
+      )
+    );
+  }
+
+  function removeOption(questionId: string, optionIndex: number) {
+    setQuestions((current) =>
+      current.map((question) => {
+        if (question.id !== questionId) return question;
+        if (question.options.length <= 2) return question;
+
+        return {
+          ...question,
+          options: question.options.filter(
+            (_, index) => index !== optionIndex
+          ),
+        };
+      })
+    );
+  }
+
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setMessage("");
+    setCopied(false);
 
-    if (!supabase || !event || busy) return;
-
-    if (attendees.some((attendee) => !attendee.name.trim())) {
-      setStatus("Please enter the name of every attendee.");
+    if (!supabase) {
+      setMessage(
+        "Event service is not connected. Please check your Cloudflare environment variables."
+      );
       return;
     }
 
-    if (
-      new Set(attendees.map((a) => a.name.trim().toLowerCase())).size !==
-      attendees.length
-    ) {
-      setStatus("Please enter a unique name for each attendee.");
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      window.location.href = "/login/";
       return;
     }
 
-    if (choice !== "no") {
-      for (const attendee of attendees) {
-        for (const question of questions) {
-          const selected = answers[attendee.id]?.[question.id] || [];
+    const preparedQuestions: QuestionDraft[] = [];
 
-          if (question.is_required && selected.length === 0) {
-            setStatus(
-              `Please answer "${question.question_text}" for ${attendee.name}.`
-            );
-            return;
-          }
+    for (const question of questions) {
+      const questionText = question.text.trim();
 
-          if (
-            question.question_type === "single_choice" &&
-            selected.length > 1
-          ) {
-            setStatus(
-              `Please select only one answer for "${question.question_text}".`
-            );
-            return;
-          }
-        }
+      if (!questionText) {
+        setMessage("Please enter text for every custom question.");
+        return;
       }
+
+      const options = question.options
+        .map((option) => option.trim())
+        .filter(Boolean);
+
+      if (options.length < 2) {
+        setMessage(
+          `Please provide at least two options for "${questionText}".`
+        );
+        return;
+      }
+
+      if (
+        new Set(options.map((option) => option.toLowerCase())).size !==
+        options.length
+      ) {
+        setMessage(
+          `Please remove duplicate options from "${questionText}".`
+        );
+        return;
+      }
+
+      preparedQuestions.push({
+        ...question,
+        text: questionText,
+        options,
+      });
     }
 
     setBusy(true);
-    setStatus("");
 
-    const attendeePayload = attendees.map((attendee) => ({
-      name: attendee.name.trim(),
-      answers:
-        choice === "no"
-          ? []
-          : questions.map((question) => ({
-              question_id: question.id,
-              option_ids: answers[attendee.id]?.[question.id] || [],
-            })),
-    }));
+    const slug = `${title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 35)}-${Math.random().toString(36).slice(2, 7)}`;
 
-    const { error } = await supabase.rpc("submit_event_rsvp", {
-      p_event_id: event.id,
-      p_guest_name: attendees[0].name.trim(),
-      p_response: choice,
-      p_attendees: attendeePayload,
-    });
+    const { data: eventData, error: eventError } = await supabase
+      .from("events")
+      .insert({
+        title,
+        slug,
+        event_date: date,
+        event_time: time,
+        location,
+        host_name: host,
+        description,
+        owner_id: user.id,
+      })
+      .select("id")
+      .single();
 
-    setBusy(false);
-
-    if (error) {
-      setStatus(error.message || "Unable to save your RSVP. Please try again.");
+    if (eventError || !eventData) {
+      setBusy(false);
+      setMessage(eventError?.message || "Unable to create the event.");
       return;
     }
 
-    setSaved(true);
-    setStatus("");
+    for (let index = 0; index < preparedQuestions.length; index++) {
+      const question = preparedQuestions[index];
+
+      const { data: questionData, error: questionError } = await supabase
+        .from("event_questions")
+        .insert({
+          event_id: eventData.id,
+          question_text: question.text,
+          question_type: question.type,
+          is_required: question.required,
+          position: index,
+        })
+        .select("id")
+        .single();
+
+      if (questionError || !questionData) {
+        setBusy(false);
+        setMessage(
+          `Your event was created, but a custom question could not be saved: ${
+            questionError?.message || "Unknown error"
+          }. Please contact support before sharing the invitation.`
+        );
+        return;
+      }
+
+      const optionRows = question.options.map((option, optionIndex) => ({
+        question_id: questionData.id,
+        option_text: option,
+        position: optionIndex,
+      }));
+
+      const { error: optionError } = await supabase
+        .from("event_question_options")
+        .insert(optionRows);
+
+      if (optionError) {
+        setBusy(false);
+        setMessage(
+          `Your event was created, but its answer options could not be saved: ${optionError.message}. Please contact support before sharing the invitation.`
+        );
+        return;
+      }
+    }
+
+    const link = `${window.location.origin}/event/?slug=${encodeURIComponent(
+      slug
+    )}`;
+
+    setEventLink(link);
+    setBusy(false);
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(eventLink);
+      setCopied(true);
+    } catch {
+      setMessage(
+        "Unable to copy automatically. Please select and copy the link."
+      );
+    }
+  }
+
+  if (eventLink) {
+    return (
+      <section className="form-shell">
+        <div className="eyebrow">✳ YOUR EVENT IS READY</div>
+
+        <h1>You're all <em>set!</em></h1>
+
+        <p className="form-intro">
+          Your event has been created successfully. Share this invitation
+          link with your friends and family.
+        </p>
+
+        <label>YOUR INVITATION LINK</label>
+
+        <input
+          readOnly
+          value={eventLink}
+          onFocus={(e) => e.currentTarget.select()}
+        />
+
+        <button type="button" className="primary" onClick={copyLink}>
+          {copied ? "✓ Link Copied!" : "Copy Invitation Link"}
+        </button>
+
+        {message && <p className="notice">{message}</p>}
+
+        <p className="notice">
+          Your guests can open this link and submit their RSVPs.
+        </p>
+
+        <a className="primary" href="/dashboard/">
+          Go to My Dashboard →
+        </a>
+
+        <a className="secondary" href="/">
+          ← Back to TGathr
+        </a>
+      </section>
+    );
   }
 
   return (
-    <section className="invite">
-      <div className="eyebrow">✳ YOU'RE INVITED</div>
+    <section className="form-shell">
+      <div className="eyebrow">LET'S GET EVERYONE TOGETHER</div>
 
-      {event ? (
-        <>
-          <h1>{event.title}</h1>
-          <p className="lead">Hosted by {event.host_name}</p>
+      <h1>Create your <em>event.</em></h1>
 
-          <div className="invite-details">
-            <p>📅 {event.event_date} · {event.event_time}</p>
-            {event.location && <p>📍 {event.location}</p>}
-            {event.description && <p>{event.description}</p>}
+      <p className="form-intro">
+        A few details, one shareable link, and you're all set.
+      </p>
+
+      <form onSubmit={submit}>
+        <label>
+          What's the occasion?
+          <input
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Birthday dinner"
+          />
+        </label>
+
+        <div className="two">
+          <label>
+            Date
+            <input
+              required
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </label>
+
+          <label>
+            Time
+            <input
+              required
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <label>
+          Where is it?
+          <input
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Address or venue"
+          />
+        </label>
+
+        <label>
+          Your name
+          <input
+            required
+            value={host}
+            onChange={(e) => setHost(e.target.value)}
+            placeholder="Host name"
+          />
+        </label>
+
+        <label>
+          A little more info
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="What should guests know?"
+          />
+        </label>
+
+        <div className="question-builder">
+          <div className="question-builder-header">
+            <span className="eyebrow">MAKE IT PERSONAL</span>
+            <h2>Guest questionnaire</h2>
+            <p>
+              Collect the details you need from your guests when they RSVP.
+              Each attendee answers individually.
+            </p>
           </div>
 
-          {saved ? (
-            <p className="notice">Thanks! Your RSVP is saved.</p>
-          ) : (
-            <form onSubmit={rsvp}>
-              <label>
-                Can you make it?
-                <select
-                  value={choice}
-                  onChange={(e) => setChoice(e.target.value)}
+          {questions.map((question, index) => (
+            <div key={question.id} className="question-card">
+              <div className="question-card-top">
+                <span className="question-number">
+                  QUESTION {String(index + 1).padStart(2, "0")}
+                </span>
+
+                <button
+                  type="button"
+                  className="question-remove-icon"
+                  onClick={() => removeQuestion(question.id)}
+                  aria-label="Remove question"
+                  title="Remove question"
                 >
-                  <option value="yes">I'm in!</option>
-                  <option value="maybe">Maybe</option>
-                  <option value="no">Can't make it</option>
-                </select>
+                  ×
+                </button>
+              </div>
+
+              <label className="question-field-label">
+                Your question
+                <input
+                  required
+                  className="question-text-input"
+                  value={question.text}
+                  onChange={(e) =>
+                    updateQuestion(question.id, {
+                      text: e.target.value,
+                    })
+                  }
+                  placeholder="e.g. What food do you prefer?"
+                />
               </label>
 
-              {choice !== "no" && (
-                <div>
-                  <h2>Who's attending?</h2>
-                  <p className="lead">
-                    Add everyone in your group. Each person can provide their
-                    own answers below.
-                  </p>
-
-                  {attendees.map((attendee, index) => (
-                    <div key={attendee.id} className="rsvp-attendee">
-                      <h3 className="rsvp-attendee-heading">
-                        Guest {index + 1}
-                      </h3>
-
-                      <label>
-                        Attendee name
-                        <input
-                          required
-                          value={attendee.name}
-                          onChange={(e) =>
-                            updateAttendeeName(attendee.id, e.target.value)
-                          }
-                          placeholder="Enter attendee name"
-                        />
-                      </label>
-
-                      {questions.map((question) => {
-                        const multiple =
-                          question.question_type === "multiple_choice";
-
-                        return (
-                          <div key={question.id} className="rsvp-question">
-                            <p className="rsvp-question-title">
-                              {question.question_text}
-                              {question.is_required && (
-                                <span className="rsvp-question-required">
-                                  Required
-                                </span>
-                              )}
-                            </p>
-
-                            {!question.is_required && (
-                              <p className="rsvp-question-subtitle">
-                                Optional · {multiple ? "Choose all that apply" : "Choose one"}
-                              </p>
-                            )}
-
-                            <div className="rsvp-options">
-                              {question.options.map((option) => {
-                                const selected =
-                                  answers[attendee.id]?.[question.id] || [];
-                                const isChecked = selected.includes(option.id);
-
-                                return (
-                                  <label
-                                    key={option.id}
-                                    className={`rsvp-option ${
-                                      isChecked ? "is-selected" : ""
-                                    }`}
-                                    data-type={multiple ? "multiple" : "single"}
-                                  >
-                                    <input
-                                      type={multiple ? "checkbox" : "radio"}
-                                      name={`${attendee.id}-${question.id}`}
-                                      checked={isChecked}
-                                      onChange={(e) =>
-                                        updateAnswer(
-                                          attendee.id,
-                                          question.id,
-                                          option.id,
-                                          multiple,
-                                          e.target.checked
-                                        )
-                                      }
-                                    />
-
-                                    <span className="rsvp-option-indicator">
-                                      ✓
-                                    </span>
-
-                                    <span className="rsvp-option-text">
-                                      {option.option_text}
-                                    </span>
-
-                                    {isChecked && (
-                                      <span className="rsvp-option-check">
-                                        ✓
-                                      </span>
-                                    )}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {attendees.length > 1 && (
-                        <button
-                          type="button"
-                          className="secondary"
-                          onClick={() => removeAttendee(attendee.id)}
-                        >
-                          Remove attendee
-                        </button>
-                      )}
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    className="rsvp-add-attendee"
-                    onClick={addAttendee}
-                  >
-                    + Add another attendee
-                  </button>
-                </div>
-              )}
-
-              {choice === "no" && (
-                <label>
-                  Your name
-                  <input
-                    required
-                    value={attendees[0].name}
+              <div className="question-settings">
+                <label className="question-field-label">
+                  Answer format
+                  <select
+                    value={question.type}
                     onChange={(e) =>
-                      updateAttendeeName(attendees[0].id, e.target.value)
+                      updateQuestion(question.id, {
+                        type: e.target.value as QuestionDraft["type"],
+                      })
                     }
-                    placeholder="Enter your name"
-                  />
+                  >
+                    <option value="single_choice">Single choice</option>
+                    <option value="multiple_choice">Multiple choice</option>
+                  </select>
                 </label>
-              )}
 
-              <button
-                className="primary rsvp-submit"
-                disabled={busy}
-              >
-                {busy ? "Sending…" : "Send RSVP"}
-              </button>
+                <div className="question-field-label">
+                  Guest response
+                  <div className="requirement-pills">
+                    <button
+                      type="button"
+                      className={`requirement-pill ${
+                        question.required ? "active" : ""
+                      }`}
+                      aria-pressed={question.required}
+                      onClick={() =>
+                        updateQuestion(question.id, { required: true })
+                      }
+                    >
+                      Required
+                    </button>
 
-              {status && <p className="notice">{status}</p>}
-            </form>
-          )}
-        </>
-      ) : (
-        <h1>{status}</h1>
-      )}
+                    <button
+                      type="button"
+                      className={`requirement-pill ${
+                        !question.required ? "active" : ""
+                      }`}
+                      aria-pressed={!question.required}
+                      onClick={() =>
+                        updateQuestion(question.id, { required: false })
+                      }
+                    >
+                      Optional
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-      <a href="/" className="secondary">
-        ← Made with TGathr
-      </a>
+              <div className="question-options-section">
+                <div className="question-options-heading">
+                  <span>Answer options</span>
+                  <span>{question.options.length} options</span>
+                </div>
+
+                {question.options.map((option, optionIndex) => (
+                  <div key={optionIndex} className="question-option-row">
+                    <span className="question-option-dot" />
+
+                    <input
+                      required
+                      value={option}
+                      onChange={(e) =>
+                        updateOption(
+                          question.id,
+                          optionIndex,
+                          e.target.value
+                        )
+                      }
+                      placeholder={`Option ${optionIndex + 1}`}
+                    />
+
+                    {question.options.length > 2 && (
+                      <button
+                        type="button"
+                        className="question-option-remove"
+                        onClick={() =>
+                          removeOption(question.id, optionIndex)
+                        }
+                        aria-label={`Remove option ${optionIndex + 1}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className="question-add-option"
+                  onClick={() => addOption(question.id)}
+                >
+                  + Add another option
+                </button>
+              </div>
+
+              <div className="question-card-footer">
+                <span>
+                  {question.required
+                    ? "Guests must answer this question"
+                    : "Guests can skip this question"}
+                </span>
+
+                <button
+                  type="button"
+                  className="question-remove-text"
+                  onClick={() => removeQuestion(question.id)}
+                >
+                  Remove question
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            className="question-add-main"
+            onClick={addQuestion}
+          >
+            <span className="question-add-symbol">+</span>
+            <span>
+              <strong>Add a question</strong>
+              <small>Create another question for your guests</small>
+            </span>
+          </button>
+        </div>
+
+        <button className="primary" disabled={busy}>
+          {busy ? "Creating..." : "Create event ↗"}
+        </button>
+
+        {message && <p className="notice">{message}</p>}
+      </form>
     </section>
   );
 }
