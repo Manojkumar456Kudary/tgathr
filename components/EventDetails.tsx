@@ -249,9 +249,14 @@ export default function EventDetails({ slug }: { slug: string }) {
     setBusy(false);
 
     if (error) {
-      setStatus(error.message || "Unable to save your RSVP. Please try again.");
-      return;
-    }
+  console.error("RSVP submission error:", error);
+  setStatus(
+    `${error.message} | Details: ${error.details || "None"} | Hint: ${
+      error.hint || "None"
+    } | Code: ${error.code || "None"}`
+  );
+  return;
+}
 
     setSaved(true);
     setStatus("");
