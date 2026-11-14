@@ -192,7 +192,10 @@ export default function EventDetails({ slug }: { slug: string }) {
       return;
     }
 
-    if (new Set(attendees.map((a) => a.name.trim().toLowerCase())).size !== attendees.length) {
+    if (
+      new Set(attendees.map((a) => a.name.trim().toLowerCase())).size !==
+      attendees.length
+    ) {
       setStatus("Please enter a unique name for each attendee.");
       return;
     }
@@ -213,7 +216,9 @@ export default function EventDetails({ slug }: { slug: string }) {
             question.question_type === "single_choice" &&
             selected.length > 1
           ) {
-            setStatus(`Please select only one answer for "${question.question_text}".`);
+            setStatus(
+              `Please select only one answer for "${question.question_text}".`
+            );
             return;
           }
         }
@@ -223,87 +228,35 @@ export default function EventDetails({ slug }: { slug: string }) {
     setBusy(true);
     setStatus("");
 
-    // Save the main RSVP using the first attendee's name.
-    const { data: rsvpData, error: rsvpError } = await supabase
-      .from("rsvps")
-      .insert({
-        event_id: event.id,
-        guest_name: attendees[0].name.trim(),
-        response: choice,
-        guest_count: attendees.length,
-      })
-      .select("id")
-      .single();
+    // Prepare each attendee and their individual answers.
+    const attendeePayload = attendees.map((attendee) => ({
+      name: attendee.name.trim(),
+      answers:
+        choice === "no"
+          ? []
+          : questions.map((question) => ({
+              question_id: question.id,
+              option_ids: answers[attendee.id]?.[question.id] || [],
+            })),
+    }));
 
-    if (rsvpError || !rsvpData) {
-      setBusy(false);
-      setStatus(rsvpError?.message || "Unable to save your RSVP.");
+    // Submit the entire RSVP through the secure database function.
+    const { error } = await supabase.rpc("submit_event_rsvp", {
+      p_event_id: event.id,
+      p_guest_name: attendees[0].name.trim(),
+      p_response: choice,
+      p_attendees: attendeePayload,
+    });
+
+    setBusy(false);
+
+    if (error) {
+      setStatus(error.message || "Unable to save your RSVP. Please try again.");
       return;
     }
 
-    // Save each attendee separately.
-    const savedAttendees: { id: string; attendee: Attendee }[] = [];
-
-    for (const attendee of attendees) {
-      const { data, error } = await supabase
-        .from("rsvp_attendees")
-        .insert({
-          rsvp_id: rsvpData.id,
-          attendee_name: attendee.name.trim(),
-        })
-        .select("id")
-        .single();
-
-      if (error || !data) {
-        setBusy(false);
-        setStatus(
-          "Your RSVP was created, but we couldn't save every attendee. Please contact the event host."
-        );
-        return;
-      }
-
-      savedAttendees.push({ id: data.id, attendee });
-    }
-
-    // Save each attendee's individual answers.
-    const answerRows: {
-      attendee_id: string;
-      question_id: string;
-      option_id: string;
-    }[] = [];
-
-    if (choice !== "no") {
-      for (const savedAttendee of savedAttendees) {
-        for (const question of questions) {
-          const selected = answers[savedAttendee.attendee.id]?.[question.id] || [];
-
-          for (const optionId of selected) {
-            answerRows.push({
-              attendee_id: savedAttendee.id,
-              question_id: question.id,
-              option_id: optionId,
-            });
-          }
-        }
-      }
-    }
-
-    if (answerRows.length > 0) {
-      const { error: answerError } = await supabase
-        .from("rsvp_answers")
-        .insert(answerRows);
-
-      if (answerError) {
-        setBusy(false);
-        setStatus(
-          "Your RSVP and attendees were saved, but some answers could not be saved. Please contact the event host."
-        );
-        return;
-      }
-    }
-
-    setBusy(false);
     setSaved(true);
+    setStatus("");
   }
 
   return (
@@ -316,7 +269,9 @@ export default function EventDetails({ slug }: { slug: string }) {
           <p className="lead">Hosted by {event.host_name}</p>
 
           <div className="invite-details">
-            <p>📅 {event.event_date} · {event.event_time}</p>
+            <p>
+              📅 {event.event_date} · {event.event_time}
+            </p>
             {event.location && <p>📍 {event.location}</p>}
             {event.description && <p>{event.description}</p>}
           </div>
@@ -452,7 +407,9 @@ export default function EventDetails({ slug }: { slug: string }) {
         <h1>{status}</h1>
       )}
 
-      <a href="/" className="secondary">← Made with TGathr</a>
+      <a href="/" className="secondary">
+        ← Made with TGathr
+      </a>
     </section>
   );
 }
