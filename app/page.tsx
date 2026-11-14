@@ -49,6 +49,7 @@ export default function Home() {
         </Link>
 
         <a className="nav-link" href="#how">How it works</a>
+        <a className="nav-link" href="#about">About</a>
 
         {!checkingSession && loggedIn && (
           <Link className="nav-link" href="/dashboard/">
@@ -184,6 +185,43 @@ export default function Home() {
         <Link className="primary" href="/create/">
           Let's make a plan <span>↗</span>
         </Link>
+      </section>
+
+      <section className="about wrap" id="about">
+        <div className="about-content">
+          <div className="eyebrow">THE STORY BEHIND TGATHR</div>
+
+          <h2>
+            A little about <em>us.</em>
+          </h2>
+
+          <h3>
+            Bringing people closer, one gathering at a time.
+          </h3>
+
+          <p>
+            TGathr was created with a simple idea: bringing people together
+            should be easy, enjoyable, and stress-free.
+          </p>
+
+          <p>
+            Whether it's a birthday party, a dinner with friends, a family
+            celebration, or a special occasion, TGathr helps you create
+            invitations, share them with your people, and keep track of
+            who's coming — all in one place.
+          </p>
+
+          <p>
+            And this is just the beginning. There's a lot more to come!
+            We're working toward making TGathr a place where planning,
+            celebrating, and connecting with people becomes even easier.
+          </p>
+
+          <div className="about-founder">
+            <strong>Manoj Kumar Kudary</strong>
+            <span>Founder, TGathr</span>
+          </div>
+        </div>
       </section>
 
       <footer className="footer wrap">
