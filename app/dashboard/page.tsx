@@ -77,12 +77,10 @@ export default function DashboardPage() {
         return;
       }
 
-      const user = session.user;
-
       const { data: eventData, error: eventError } = await supabase
         .from("events")
         .select("*")
-        .eq("owner_id", user.id)
+        .eq("owner_id", session.user.id)
         .order("created_at", { ascending: false });
 
       if (eventError) {
@@ -208,29 +206,32 @@ export default function DashboardPage() {
       .map((answer) =>
         options.find((option) => option.id === answer.option_id)?.option_text
       )
-      .filter(Boolean);
+      .filter(Boolean) as string[];
+  }
+
+  function getPeopleCount(list: RSVPRecord[]) {
+    return list.reduce(
+      (sum, rsvp) => sum + Math.max(Number(rsvp.guest_count || 1), 1),
+      0
+    );
   }
 
   if (loading) {
     return (
-      <main className="subpage">
-        <section className="form-shell">
-          <h1>Loading your dashboard...</h1>
+      <main className="subpage dashboard-page">
+        <section className="dashboard-shell">
+          <p className="dashboard-loading">Loading your dashboard...</p>
         </section>
       </main>
     );
   }
 
-  const totalYes = rsvps.filter((r) => r.response === "yes").length;
-  const totalMaybe = rsvps.filter((r) => r.response === "maybe").length;
-  const totalNo = rsvps.filter((r) => r.response === "no").length;
-
-  const attendingPeople = rsvps
-    .filter((r) => r.response === "yes")
-    .reduce((sum, r) => sum + Number(r.guest_count || 1), 0);
+  const totalAttending = getPeopleCount(
+    rsvps.filter((rsvp) => rsvp.response === "yes")
+  );
 
   return (
-    <main className="subpage">
+    <main className="subpage dashboard-page">
       <header className="nav wrap">
         <a className="brand" href="/">
           tgathr<span className="dot">.</span>
@@ -241,284 +242,404 @@ export default function DashboardPage() {
         </button>
       </header>
 
-      <section className="form-shell">
-        <div className="eyebrow">YOUR PRIVATE EVENT SPACE</div>
-
-        <h1>Your <em>dashboard.</em></h1>
-
-        <p className="form-intro">
-          Track responses from guests invited to your events.
-        </p>
+      <section className="dashboard-shell">
+        <div className="dashboard-header">
+          <div className="eyebrow">YOUR PRIVATE EVENT SPACE</div>
+          <h1>
+            Your <em>dashboard.</em>
+          </h1>
+          <p className="form-intro">
+            Everything happening with your events, all in one place.
+          </p>
+        </div>
 
         {message && <p className="notice">{message}</p>}
 
-        <div className="invite-details">
-          <p>Events created: <strong>{events.length}</strong></p>
-          <p>People attending: <strong>{attendingPeople}</strong></p>
-          <p>Yes responses: <strong>{totalYes}</strong></p>
-          <p>Maybe responses: <strong>{totalMaybe}</strong></p>
-          <p>No responses: <strong>{totalNo}</strong></p>
+        <div className="dashboard-overview">
+          <div className="dashboard-overview-card">
+            <span className="dashboard-stat-label">Events created</span>
+            <strong>{events.length}</strong>
+          </div>
+
+          <div className="dashboard-overview-card dashboard-overview-highlight">
+            <span className="dashboard-stat-label">People attending</span>
+            <strong>{totalAttending}</strong>
+          </div>
         </div>
 
         {events.length === 0 ? (
-          <div>
+          <div className="dashboard-empty">
+            <h2>Your next gathering starts here.</h2>
             <p>You haven't created any events yet.</p>
             <a className="primary" href="/create/">
-              Create an event →
+              Create your first event →
             </a>
           </div>
         ) : (
-          events.map((event) => {
-            const eventRsvps = rsvps.filter(
-              (rsvp) => rsvp.event_id === event.id
-            );
+          <div className="dashboard-event-list">
+            {events.map((event) => {
+              const eventRsvps = rsvps.filter(
+                (rsvp) => rsvp.event_id === event.id
+              );
 
-            const yes = eventRsvps.filter(
-              (rsvp) => rsvp.response === "yes"
-            );
+              const yes = eventRsvps.filter(
+                (rsvp) => rsvp.response === "yes"
+              );
 
-            const maybe = eventRsvps.filter(
-              (rsvp) => rsvp.response === "maybe"
-            );
+              const maybe = eventRsvps.filter(
+                (rsvp) => rsvp.response === "maybe"
+              );
 
-            const no = eventRsvps.filter(
-              (rsvp) => rsvp.response === "no"
-            );
+              const no = eventRsvps.filter(
+                (rsvp) => rsvp.response === "no"
+              );
 
-            const people = yes.reduce(
-              (sum, rsvp) => sum + Number(rsvp.guest_count || 1),
-              0
-            );
+              const yesPeople = getPeopleCount(yes);
+              const maybePeople = getPeopleCount(maybe);
+              const noPeople = getPeopleCount(no);
 
-            const eventQuestions = questions.filter(
-              (question) => question.event_id === event.id
-            );
+              const eventQuestions = questions.filter(
+                (question) => question.event_id === event.id
+              );
 
-            const invitationLink =
-              `${window.location.origin}/event/?slug=${encodeURIComponent(event.slug)}`;
+              const invitationLink =
+                `${window.location.origin}/event/?slug=${encodeURIComponent(event.slug)}`;
 
-            const yesRsvpIds = new Set(yes.map((rsvp) => rsvp.id));
+              const yesRsvpIds = new Set(yes.map((rsvp) => rsvp.id));
 
-            const attendingAttendees = attendees.filter((attendee) =>
-              yesRsvpIds.has(attendee.rsvp_id)
-            );
+              const attendingAttendees = attendees.filter((attendee) =>
+                yesRsvpIds.has(attendee.rsvp_id)
+              );
 
-            return (
-              <div className="invite-details" key={event.id}>
-                <h2>{event.title}</h2>
+              const totalResponses = eventRsvps.length;
 
-                <p>📅 {event.event_date} · {event.event_time}</p>
+              return (
+                <article className="dashboard-event-card" key={event.id}>
+                  <div className="dashboard-event-top">
+                    <div>
+                      <span className="dashboard-event-label">
+                        YOUR EVENT
+                      </span>
+                      <h2>{event.title}</h2>
 
-                {event.location && <p>📍 {event.location}</p>}
-
-                <div className="invite-details">
-                  <p>
-                    <strong>People attending</strong>
-                  </p>
-                  <h2>{people}</h2>
-
-                  <p>
-                    Yes: <strong>{yes.length}</strong>
-                    {" · "}
-                    Maybe: <strong>{maybe.length}</strong>
-                    {" · "}
-                    No: <strong>{no.length}</strong>
-                  </p>
-                </div>
-
-                <label>Invitation link</label>
-                <input
-                  readOnly
-                  value={invitationLink}
-                  onFocus={(e) => e.currentTarget.select()}
-                />
-
-                <h3>Attending guests</h3>
-
-                {yes.length === 0 ? (
-                  <p>No confirmed attendees yet.</p>
-                ) : (
-                  yes.map((rsvp) => {
-                    const group = attendees.filter(
-                      (attendee) => attendee.rsvp_id === rsvp.id
-                    );
-
-                    const extraCount = Math.max(
-                      Number(rsvp.guest_count || 1) - 1,
-                      0
-                    );
-
-                    const additionalNames = group.filter(
-                      (attendee) =>
-                        attendee.attendee_name.trim().toLowerCase() !==
-                        rsvp.guest_name.trim().toLowerCase()
-                    );
-
-                    return (
-                      <div key={rsvp.id}>
-                        <p>
-                          <strong>{rsvp.guest_name}</strong>
-                          {extraCount > 0 && (
-                            <strong> +{extraCount}</strong>
-                          )}
-                        </p>
-
-                        {additionalNames.length > 0 && (
-                          <p>
-                            Also attending:{" "}
-                            {additionalNames
-                              .map((attendee) => attendee.attendee_name)
-                              .join(", ")}
-                          </p>
-                        )}
-
-                        {group.length === 0 && extraCount > 0 && (
-                          <p>
-                            <em>
-                              Individual guest names are not available for
-                              this older RSVP.
-                            </em>
-                          </p>
+                      <div className="dashboard-event-meta">
+                        <span>📅 {event.event_date}</span>
+                        <span>🕒 {event.event_time}</span>
+                        {event.location && (
+                          <span>📍 {event.location}</span>
                         )}
                       </div>
-                    );
-                  })
-                )}
+                    </div>
+                  </div>
 
-                <details className="detailed-report">
-                  <summary>
-                    <strong>View detailed report</strong>
-                  </summary>
+                  <div className="dashboard-event-stats">
+                    <div className="dashboard-event-stat dashboard-event-stat-primary">
+                      <span>People attending</span>
+                      <strong>{yesPeople}</strong>
+                    </div>
 
-                  <div>
-                    <h3>RSVP summary</h3>
+                    <div className="dashboard-event-stat">
+                      <span>RSVP responses</span>
+                      <strong>{totalResponses}</strong>
+                    </div>
+                  </div>
 
-                    <p>
-                      Yes: <strong>{yes.length}</strong>
+                  <div className="dashboard-response-section">
+                    <h3>Response breakdown</h3>
+
+                    <div className="dashboard-response-grid">
+                      <div className="dashboard-response-item">
+                        <span className="dashboard-response-dot yes-dot" />
+                        <div>
+                          <strong>{yesPeople}</strong>
+                          <span>Yes</span>
+                        </div>
+                      </div>
+
+                      <div className="dashboard-response-item">
+                        <span className="dashboard-response-dot maybe-dot" />
+                        <div>
+                          <strong>{maybePeople}</strong>
+                          <span>Maybe</span>
+                        </div>
+                      </div>
+
+                      <div className="dashboard-response-item">
+                        <span className="dashboard-response-dot no-dot" />
+                        <div>
+                          <strong>{noPeople}</strong>
+                          <span>No</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="dashboard-small-note">
+                      Counts represent people, including additional guests.
                     </p>
-                    <p>
-                      Maybe: <strong>{maybe.length}</strong>
-                    </p>
-                    <p>
-                      No: <strong>{no.length}</strong>
-                    </p>
-                    <p>
-                      Total confirmed attendees: <strong>{people}</strong>
-                    </p>
+                  </div>
 
-                    <h3>Individual attendee answers</h3>
+                  <div className="dashboard-invitation">
+                    <label>Invitation link</label>
+                    <input
+                      readOnly
+                      value={invitationLink}
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                  </div>
 
-                    {attendingAttendees.length === 0 ? (
-                      <p>
-                        Individual attendee details are not available for
-                        these responses.
-                      </p>
+                  <div className="dashboard-attending-section">
+                    <div className="dashboard-section-heading">
+                      <div>
+                        <h3>Who's attending</h3>
+                        <p>
+                          {yesPeople} confirmed{" "}
+                          {yesPeople === 1 ? "person" : "people"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {yes.length === 0 ? (
+                      <div className="dashboard-no-attendees">
+                        No confirmed attendees yet. Share your invitation to
+                        get started.
+                      </div>
                     ) : (
-                      attendingAttendees.map((attendee) => {
-                        const attendeeRsvp = yes.find(
-                          (rsvp) => rsvp.id === attendee.rsvp_id
-                        );
-
-                        return (
-                          <div key={attendee.id}>
-                            <h4>{attendee.attendee_name}</h4>
-
-                            {eventQuestions.length === 0 ? (
-                              <p>No custom questions for this event.</p>
-                            ) : (
-                              eventQuestions.map((question) => {
-                                const attendeeAnswers = getAttendeeAnswers(
-                                  attendee.id,
-                                  question.id
-                                );
-
-                                return (
-                                  <p key={question.id}>
-                                    {question.question_text}:{" "}
-                                    <strong>
-                                      {attendeeAnswers.length > 0
-                                        ? attendeeAnswers.join(", ")
-                                        : "No answer"}
-                                    </strong>
-                                  </p>
-                                );
-                              })
-                            )}
-
-                            {attendeeRsvp && (
-                              <p>
-                                <em>
-                                  RSVP submitted by {attendeeRsvp.guest_name}
-                                </em>
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-
-                    {eventQuestions.length > 0 && (
-                      <>
-                        <h3>Custom question totals</h3>
-
-                        {eventQuestions.map((question) => {
-                          const questionOptions = options.filter(
-                            (option) => option.question_id === question.id
+                      <div className="dashboard-attendee-list">
+                        {yes.map((rsvp) => {
+                          const group = attendees.filter(
+                            (attendee) => attendee.rsvp_id === rsvp.id
                           );
 
-                          const attendingIds = new Set(
-                            attendingAttendees.map((attendee) => attendee.id)
+                          const extraCount = Math.max(
+                            Number(rsvp.guest_count || 1) - 1,
+                            0
+                          );
+
+                          const additionalNames = group.filter(
+                            (attendee) =>
+                              attendee.attendee_name.trim().toLowerCase() !==
+                              rsvp.guest_name.trim().toLowerCase()
                           );
 
                           return (
-                            <div key={question.id}>
-                              <h4>{question.question_text}</h4>
+                            <div
+                              className="dashboard-attendee-row"
+                              key={rsvp.id}
+                            >
+                              <div className="dashboard-attendee-avatar">
+                                {rsvp.guest_name.charAt(0).toUpperCase()}
+                              </div>
 
-                              <p>
-                                {question.question_type === "multiple_choice"
-                                  ? "Multiple choice"
-                                  : "Single choice"}
-                              </p>
+                              <div className="dashboard-attendee-info">
+                                <strong>{rsvp.guest_name}</strong>
 
-                              {questionOptions.map((option) => {
-                                const count = answers.filter(
-                                  (answer) =>
-                                    answer.question_id === question.id &&
-                                    answer.option_id === option.id &&
-                                    attendingIds.has(answer.attendee_id)
-                                ).length;
+                                {additionalNames.length > 0 && (
+                                  <span>
+                                    Also:{" "}
+                                    {additionalNames
+                                      .map((attendee) => attendee.attendee_name)
+                                      .join(", ")}
+                                  </span>
+                                )}
+                              </div>
 
-                                return (
-                                  <p key={option.id}>
-                                    {option.option_text}:{" "}
-                                    <strong>{count}</strong>
-                                  </p>
-                                );
-                              })}
-
-                              <p>
-                                <em>
-                                  Counts include confirmed attendees who
-                                  selected each option.
-                                  For multiple-choice questions, one person
-                                  can contribute to more than one option.
-                                </em>
-                              </p>
+                              {extraCount > 0 && (
+                                <span className="dashboard-guest-count">
+                                  +{extraCount}
+                                </span>
+                              )}
                             </div>
                           );
                         })}
-                      </>
+                      </div>
                     )}
                   </div>
-                </details>
-              </div>
-            );
-          })
+
+                  <details className="dashboard-report">
+                    <summary>
+                      <span>View detailed report</span>
+                      <span className="dashboard-report-arrow">＋</span>
+                    </summary>
+
+                    <div className="dashboard-report-content">
+                      <section className="dashboard-report-section">
+                        <h3>RSVP summary</h3>
+
+                        <div className="dashboard-report-summary">
+                          <div>
+                            <span>Yes</span>
+                            <strong>{yesPeople} people</strong>
+                            <small>{yes.length} responses</small>
+                          </div>
+
+                          <div>
+                            <span>Maybe</span>
+                            <strong>{maybePeople} people</strong>
+                            <small>{maybe.length} responses</small>
+                          </div>
+
+                          <div>
+                            <span>No</span>
+                            <strong>{noPeople} people</strong>
+                            <small>{no.length} responses</small>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="dashboard-report-section">
+                        <h3>Custom question totals</h3>
+
+                        {eventQuestions.length === 0 ? (
+                          <p>No custom questions were added to this event.</p>
+                        ) : (
+                          eventQuestions.map((question) => {
+                            const questionOptions = options.filter(
+                              (option) => option.question_id === question.id
+                            );
+
+                            const attendingIds = new Set(
+                              attendingAttendees.map((attendee) => attendee.id)
+                            );
+
+                            const totalSelections = answers.filter(
+                              (answer) =>
+                                answer.question_id === question.id &&
+                                attendingIds.has(answer.attendee_id)
+                            ).length;
+
+                            return (
+                              <div
+                                className="dashboard-question-result"
+                                key={question.id}
+                              >
+                                <h4>{question.question_text}</h4>
+
+                                <p className="dashboard-question-type">
+                                  {question.question_type === "multiple_choice"
+                                    ? "Multiple choice"
+                                    : "Single choice"}
+                                </p>
+
+                                {questionOptions.map((option) => {
+                                  const count = answers.filter(
+                                    (answer) =>
+                                      answer.question_id === question.id &&
+                                      answer.option_id === option.id &&
+                                      attendingIds.has(answer.attendee_id)
+                                  ).length;
+
+                                  const percentage =
+                                    totalSelections > 0
+                                      ? (count / totalSelections) * 100
+                                      : 0;
+
+                                  return (
+                                    <div
+                                      className="dashboard-option-result"
+                                      key={option.id}
+                                    >
+                                      <div className="dashboard-option-label">
+                                        <span>{option.option_text}</span>
+                                        <strong>{count}</strong>
+                                      </div>
+
+                                      <div className="dashboard-option-track">
+                                        <div
+                                          className="dashboard-option-fill"
+                                          style={{
+                                            width: `${percentage}%`,
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                <p className="dashboard-small-note">
+                                  Counts include confirmed attendees who
+                                  selected each option. For multiple-choice
+                                  questions, one person can select more than
+                                  one option.
+                                </p>
+                              </div>
+                            );
+                          })
+                        )}
+                      </section>
+
+                      <section className="dashboard-report-section">
+                        <h3>Individual attendee answers</h3>
+
+                        {attendingAttendees.length === 0 ? (
+                          <p>
+                            Individual attendee details are not available for
+                            these responses.
+                          </p>
+                        ) : (
+                          <div className="dashboard-individual-list">
+                            {attendingAttendees.map((attendee) => {
+                              const attendeeRsvp = yes.find(
+                                (rsvp) => rsvp.id === attendee.rsvp_id
+                              );
+
+                              return (
+                                <div
+                                  className="dashboard-individual-card"
+                                  key={attendee.id}
+                                >
+                                  <h4>{attendee.attendee_name}</h4>
+
+                                  {eventQuestions.length === 0 ? (
+                                    <p>No custom questions for this event.</p>
+                                  ) : (
+                                    eventQuestions.map((question) => {
+                                      const attendeeAnswers =
+                                        getAttendeeAnswers(
+                                          attendee.id,
+                                          question.id
+                                        );
+
+                                      return (
+                                        <div
+                                          className="dashboard-answer-row"
+                                          key={question.id}
+                                        >
+                                          <span>{question.question_text}</span>
+                                          <strong>
+                                            {attendeeAnswers.length > 0
+                                              ? attendeeAnswers.join(", ")
+                                              : "No answer"}
+                                          </strong>
+                                        </div>
+                                      );
+                                    })
+                                  )}
+
+                                  {attendeeRsvp && (
+                                    <p className="dashboard-submitted-by">
+                                      RSVP submitted by{" "}
+                                      {attendeeRsvp.guest_name}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </section>
+                    </div>
+                  </details>
+                </article>
+              );
+            })}
+          </div>
         )}
 
-        <a className="secondary" href="/create/">
-          + Create another event
-        </a>
+        <div className="dashboard-create-another">
+          <a className="secondary" href="/create/">
+            + Create another event
+          </a>
+        </div>
       </section>
     </main>
   );
