@@ -212,7 +212,7 @@ export default function Home() {
           </p>
 
           <p>
-            And this is just the beginning. There's a lot more to come!
+            <strong>And this is just the beginning.</strong> There's a lot more to come!
             We're working toward making TGathr a place where planning,
             celebrating, and connecting with people becomes even easier.
           </p>
