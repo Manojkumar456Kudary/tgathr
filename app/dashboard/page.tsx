@@ -198,6 +198,19 @@ export default function DashboardPage() {
     window.location.href = "/login/";
   }
 
+  function getAttendeeAnswers(attendeeId: string, questionId: string) {
+    return answers
+      .filter(
+        (answer) =>
+          answer.attendee_id === attendeeId &&
+          answer.question_id === questionId
+      )
+      .map((answer) =>
+        options.find((option) => option.id === answer.option_id)?.option_text
+      )
+      .filter(Boolean);
+  }
+
   if (loading) {
     return (
       <main className="subpage">
@@ -215,20 +228,6 @@ export default function DashboardPage() {
   const attendingPeople = rsvps
     .filter((r) => r.response === "yes")
     .reduce((sum, r) => sum + Number(r.guest_count || 1), 0);
-
-  function getAttendeeAnswers(attendeeId: string, questionId: string) {
-    const selectedAnswers = answers.filter(
-      (answer) =>
-        answer.attendee_id === attendeeId &&
-        answer.question_id === questionId
-    );
-
-    return selectedAnswers
-      .map((answer) =>
-        options.find((option) => option.id === answer.option_id)?.option_text
-      )
-      .filter(Boolean);
-  }
 
   return (
     <main className="subpage">
@@ -255,10 +254,10 @@ export default function DashboardPage() {
 
         <div className="invite-details">
           <p>Events created: <strong>{events.length}</strong></p>
-          <p>Yes: <strong>{totalYes}</strong></p>
-          <p>Maybe: <strong>{totalMaybe}</strong></p>
-          <p>No: <strong>{totalNo}</strong></p>
-          <p>Expected attendees: <strong>{attendingPeople}</strong></p>
+          <p>People attending: <strong>{attendingPeople}</strong></p>
+          <p>Yes responses: <strong>{totalYes}</strong></p>
+          <p>Maybe responses: <strong>{totalMaybe}</strong></p>
+          <p>No responses: <strong>{totalNo}</strong></p>
         </div>
 
         {events.length === 0 ? (
@@ -298,6 +297,12 @@ export default function DashboardPage() {
             const invitationLink =
               `${window.location.origin}/event/?slug=${encodeURIComponent(event.slug)}`;
 
+            const yesRsvpIds = new Set(yes.map((rsvp) => rsvp.id));
+
+            const attendingAttendees = attendees.filter((attendee) =>
+              yesRsvpIds.has(attendee.rsvp_id)
+            );
+
             return (
               <div className="invite-details" key={event.id}>
                 <h2>{event.title}</h2>
@@ -306,13 +311,20 @@ export default function DashboardPage() {
 
                 {event.location && <p>📍 {event.location}</p>}
 
-                <p>
-                  Yes: <strong>{yes.length}</strong> ·
-                  Maybe: <strong>{maybe.length}</strong> ·
-                  No: <strong>{no.length}</strong>
-                </p>
+                <div className="invite-details">
+                  <p>
+                    <strong>People attending</strong>
+                  </p>
+                  <h2>{people}</h2>
 
-                <p>People attending: <strong>{people}</strong></p>
+                  <p>
+                    Yes: <strong>{yes.length}</strong>
+                    {" · "}
+                    Maybe: <strong>{maybe.length}</strong>
+                    {" · "}
+                    No: <strong>{no.length}</strong>
+                  </p>
+                </div>
 
                 <label>Invitation link</label>
                 <input
@@ -321,58 +333,50 @@ export default function DashboardPage() {
                   onFocus={(e) => e.currentTarget.select()}
                 />
 
-                <h3>Guest responses</h3>
+                <h3>Attending guests</h3>
 
-                {eventRsvps.length === 0 ? (
-                  <p>No one has responded yet.</p>
+                {yes.length === 0 ? (
+                  <p>No confirmed attendees yet.</p>
                 ) : (
-                  eventRsvps.map((rsvp) => {
-                    const rsvpAttendees = attendees.filter(
+                  yes.map((rsvp) => {
+                    const group = attendees.filter(
                       (attendee) => attendee.rsvp_id === rsvp.id
+                    );
+
+                    const extraCount = Math.max(
+                      Number(rsvp.guest_count || 1) - 1,
+                      0
+                    );
+
+                    const additionalNames = group.filter(
+                      (attendee) =>
+                        attendee.attendee_name.trim().toLowerCase() !==
+                        rsvp.guest_name.trim().toLowerCase()
                     );
 
                     return (
                       <div key={rsvp.id}>
                         <p>
                           <strong>{rsvp.guest_name}</strong>
-                          {" — "}
-                          {rsvp.response.toUpperCase()}
-                          {" — "}
-                          {rsvp.guest_count}{" "}
-                          {rsvp.guest_count === 1 ? "person" : "people"}
+                          {extraCount > 0 && (
+                            <strong> +{extraCount}</strong>
+                          )}
                         </p>
 
-                        {rsvpAttendees.length > 0 ? (
-                          rsvpAttendees.map((attendee) => (
-                            <div key={attendee.id}>
-                              <p>
-                                <strong>Attendee: {attendee.attendee_name}</strong>
-                              </p>
+                        {additionalNames.length > 0 && (
+                          <p>
+                            Also attending:{" "}
+                            {additionalNames
+                              .map((attendee) => attendee.attendee_name)
+                              .join(", ")}
+                          </p>
+                        )}
 
-                              {eventQuestions.map((question) => {
-                                const attendeeAnswers = getAttendeeAnswers(
-                                  attendee.id,
-                                  question.id
-                                );
-
-                                return (
-                                  <p key={question.id}>
-                                    <span>{question.question_text}: </span>
-                                    <strong>
-                                      {attendeeAnswers.length > 0
-                                        ? attendeeAnswers.join(", ")
-                                        : "No answer"}
-                                    </strong>
-                                  </p>
-                                );
-                              })}
-                            </div>
-                          ))
-                        ) : (
+                        {group.length === 0 && extraCount > 0 && (
                           <p>
                             <em>
-                              Individual attendee details are not available
-                              for this older RSVP.
+                              Individual guest names are not available for
+                              this older RSVP.
                             </em>
                           </p>
                         )}
@@ -381,62 +385,132 @@ export default function DashboardPage() {
                   })
                 )}
 
-                {eventQuestions.length > 0 && (
-                  <>
-                    <h3>Custom question reports</h3>
+                <details className="detailed-report">
+                  <summary>
+                    <strong>View detailed report</strong>
+                  </summary>
 
-                    {eventQuestions.map((question) => {
-                      const questionOptions = options.filter(
-                        (option) => option.question_id === question.id
-                      );
+                  <div>
+                    <h3>RSVP summary</h3>
 
-                      const yesRsvpIds = new Set(
-                        yes.map((rsvp) => rsvp.id)
-                      );
+                    <p>
+                      Yes: <strong>{yes.length}</strong>
+                    </p>
+                    <p>
+                      Maybe: <strong>{maybe.length}</strong>
+                    </p>
+                    <p>
+                      No: <strong>{no.length}</strong>
+                    </p>
+                    <p>
+                      Total confirmed attendees: <strong>{people}</strong>
+                    </p>
 
-                      const attendingIds = new Set(
-                        attendees
-                          .filter((attendee) =>
-                            yesRsvpIds.has(attendee.rsvp_id)
-                          )
-                          .map((attendee) => attendee.id)
-                      );
+                    <h3>Individual attendee answers</h3>
 
-                      return (
-                        <div key={question.id}>
-                          <h4>{question.question_text}</h4>
+                    {attendingAttendees.length === 0 ? (
+                      <p>
+                        Individual attendee details are not available for
+                        these responses.
+                      </p>
+                    ) : (
+                      attendingAttendees.map((attendee) => {
+                        const attendeeRsvp = yes.find(
+                          (rsvp) => rsvp.id === attendee.rsvp_id
+                        );
 
-                          <p>
-                            {question.question_type === "multiple_choice"
-                              ? "Multiple choice"
-                              : "Single choice"}
-                          </p>
+                        return (
+                          <div key={attendee.id}>
+                            <h4>{attendee.attendee_name}</h4>
 
-                          {questionOptions.map((option) => {
-                            const count = answers.filter(
-                              (answer) =>
-                                answer.question_id === question.id &&
-                                answer.option_id === option.id &&
-                                attendingIds.has(answer.attendee_id)
-                            ).length;
+                            {eventQuestions.length === 0 ? (
+                              <p>No custom questions for this event.</p>
+                            ) : (
+                              eventQuestions.map((question) => {
+                                const attendeeAnswers = getAttendeeAnswers(
+                                  attendee.id,
+                                  question.id
+                                );
 
-                            return (
-                              <p key={option.id}>
-                                {option.option_text}: <strong>{count}</strong>
+                                return (
+                                  <p key={question.id}>
+                                    {question.question_text}:{" "}
+                                    <strong>
+                                      {attendeeAnswers.length > 0
+                                        ? attendeeAnswers.join(", ")
+                                        : "No answer"}
+                                    </strong>
+                                  </p>
+                                );
+                              })
+                            )}
+
+                            {attendeeRsvp && (
+                              <p>
+                                <em>
+                                  RSVP submitted by {attendeeRsvp.guest_name}
+                                </em>
                               </p>
-                            );
-                          })}
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
 
-                          <p>
-                            <em>
-                              Counts include attendees whose RSVP status is Yes.
-                            </em>
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
+                    {eventQuestions.length > 0 && (
+                      <>
+                        <h3>Custom question totals</h3>
+
+                        {eventQuestions.map((question) => {
+                          const questionOptions = options.filter(
+                            (option) => option.question_id === question.id
+                          );
+
+                          const attendingIds = new Set(
+                            attendingAttendees.map((attendee) => attendee.id)
+                          );
+
+                          return (
+                            <div key={question.id}>
+                              <h4>{question.question_text}</h4>
+
+                              <p>
+                                {question.question_type === "multiple_choice"
+                                  ? "Multiple choice"
+                                  : "Single choice"}
+                              </p>
+
+                              {questionOptions.map((option) => {
+                                const count = answers.filter(
+                                  (answer) =>
+                                    answer.question_id === question.id &&
+                                    answer.option_id === option.id &&
+                                    attendingIds.has(answer.attendee_id)
+                                ).length;
+
+                                return (
+                                  <p key={option.id}>
+                                    {option.option_text}:{" "}
+                                    <strong>{count}</strong>
+                                  </p>
+                                );
+                              })}
+
+                              <p>
+                                <em>
+                                  Counts include confirmed attendees who
+                                  selected each option.
+                                  For multiple-choice questions, one person
+                                  can contribute to more than one option.
+                                </em>
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                </details>
               </div>
             );
           })
