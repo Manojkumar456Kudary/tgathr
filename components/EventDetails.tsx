@@ -228,7 +228,6 @@ export default function EventDetails({ slug }: { slug: string }) {
     setBusy(true);
     setStatus("");
 
-    // Prepare each attendee and their individual answers.
     const attendeePayload = attendees.map((attendee) => ({
       name: attendee.name.trim(),
       answers:
@@ -240,7 +239,6 @@ export default function EventDetails({ slug }: { slug: string }) {
             })),
     }));
 
-    // Submit the entire RSVP through the secure database function.
     const { error } = await supabase.rpc("submit_event_rsvp", {
       p_event_id: event.id,
       p_guest_name: attendees[0].name.trim(),
@@ -269,9 +267,7 @@ export default function EventDetails({ slug }: { slug: string }) {
           <p className="lead">Hosted by {event.host_name}</p>
 
           <div className="invite-details">
-            <p>
-              📅 {event.event_date} · {event.event_time}
-            </p>
+            <p>📅 {event.event_date} · {event.event_time}</p>
             {event.location && <p>📍 {event.location}</p>}
             {event.description && <p>{event.description}</p>}
           </div>
@@ -301,9 +297,13 @@ export default function EventDetails({ slug }: { slug: string }) {
                   </p>
 
                   {attendees.map((attendee, index) => (
-                    <div key={attendee.id} className="invite-details">
+                    <div key={attendee.id} className="rsvp-attendee">
+                      <h3 className="rsvp-attendee-heading">
+                        Guest {index + 1}
+                      </h3>
+
                       <label>
-                        Attendee {index + 1} name
+                        Attendee name
                         <input
                           required
                           value={attendee.name}
@@ -314,50 +314,76 @@ export default function EventDetails({ slug }: { slug: string }) {
                         />
                       </label>
 
-                      {questions.map((question) => (
-                        <div key={question.id}>
-                          <p>
-                            <strong>{question.question_text}</strong>
-                            {question.is_required ? " *" : " (Optional)"}
-                          </p>
+                      {questions.map((question) => {
+                        const multiple =
+                          question.question_type === "multiple_choice";
 
-                          {question.options.map((option) => {
-                            const selected =
-                              answers[attendee.id]?.[question.id] || [];
-                            const isChecked = selected.includes(option.id);
-                            const multiple =
-                              question.question_type === "multiple_choice";
+                        return (
+                          <div key={question.id} className="rsvp-question">
+                            <p className="rsvp-question-title">
+                              {question.question_text}
+                              {question.is_required && (
+                                <span className="rsvp-question-required">
+                                  Required
+                                </span>
+                              )}
+                            </p>
 
-                            return (
-                              <label
-                                key={option.id}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                  marginBottom: "8px",
-                                }}
-                              >
-                                <input
-                                  type={multiple ? "checkbox" : "radio"}
-                                  name={`${attendee.id}-${question.id}`}
-                                  checked={isChecked}
-                                  onChange={(e) =>
-                                    updateAnswer(
-                                      attendee.id,
-                                      question.id,
-                                      option.id,
-                                      multiple,
-                                      e.target.checked
-                                    )
-                                  }
-                                />
-                                {option.option_text}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      ))}
+                            {!question.is_required && (
+                              <p className="rsvp-question-subtitle">
+                                Optional · {multiple ? "Choose all that apply" : "Choose one"}
+                              </p>
+                            )}
+
+                            <div className="rsvp-options">
+                              {question.options.map((option) => {
+                                const selected =
+                                  answers[attendee.id]?.[question.id] || [];
+                                const isChecked = selected.includes(option.id);
+
+                                return (
+                                  <label
+                                    key={option.id}
+                                    className={`rsvp-option ${
+                                      isChecked ? "is-selected" : ""
+                                    }`}
+                                    data-type={multiple ? "multiple" : "single"}
+                                  >
+                                    <input
+                                      type={multiple ? "checkbox" : "radio"}
+                                      name={`${attendee.id}-${question.id}`}
+                                      checked={isChecked}
+                                      onChange={(e) =>
+                                        updateAnswer(
+                                          attendee.id,
+                                          question.id,
+                                          option.id,
+                                          multiple,
+                                          e.target.checked
+                                        )
+                                      }
+                                    />
+
+                                    <span className="rsvp-option-indicator">
+                                      ✓
+                                    </span>
+
+                                    <span className="rsvp-option-text">
+                                      {option.option_text}
+                                    </span>
+
+                                    {isChecked && (
+                                      <span className="rsvp-option-check">
+                                        ✓
+                                      </span>
+                                    )}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
 
                       {attendees.length > 1 && (
                         <button
@@ -373,7 +399,7 @@ export default function EventDetails({ slug }: { slug: string }) {
 
                   <button
                     type="button"
-                    className="secondary"
+                    className="rsvp-add-attendee"
                     onClick={addAttendee}
                   >
                     + Add another attendee
@@ -395,7 +421,10 @@ export default function EventDetails({ slug }: { slug: string }) {
                 </label>
               )}
 
-              <button className="primary" disabled={busy}>
+              <button
+                className="primary rsvp-submit"
+                disabled={busy}
+              >
                 {busy ? "Sending…" : "Send RSVP"}
               </button>
 
