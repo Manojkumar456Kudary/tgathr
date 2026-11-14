@@ -21,7 +21,6 @@ export default function CreateEvent() {
   const [description, setDescription] = useState("");
 
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
-
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [eventLink, setEventLink] = useState("");
@@ -84,8 +83,9 @@ export default function CreateEvent() {
   function removeOption(questionId: string, optionIndex: number) {
     setQuestions((current) =>
       current.map((question) => {
-        if (question.id !== questionId) return question;
-        if (question.options.length <= 2) return question;
+        if (question.id !== questionId || question.options.length <= 2) {
+          return question;
+        }
 
         return {
           ...question,
@@ -362,174 +362,229 @@ export default function CreateEvent() {
           />
         </label>
 
-        <div className="question-builder">
-          <div className="question-builder-header">
+        <section className="questionnaire-builder">
+          <header className="questionnaire-heading">
             <span className="eyebrow">MAKE IT PERSONAL</span>
-            <h2>Guest questionnaire</h2>
+            <h2>Guest questions</h2>
             <p>
-              Collect the details you need from your guests when they RSVP.
-              Each attendee answers individually.
+              Get to know who's coming. Add questions that each guest can
+              answer when they RSVP.
             </p>
-          </div>
+          </header>
 
-          {questions.map((question, index) => (
-            <div key={question.id} className="question-card">
-              <div className="question-card-top">
-                <span className="question-number">
-                  QUESTION {String(index + 1).padStart(2, "0")}
-                </span>
+          {questions.length === 0 ? (
+            <div className="questionnaire-empty">
+              <div className="questionnaire-empty-icon">✳</div>
+              <h3>Make your event more personal</h3>
+              <p>
+                Ask about food preferences, dietary choices, plus-ones, or
+                anything else you need to know.
+              </p>
+              <button
+                type="button"
+                className="questionnaire-start-button"
+                onClick={addQuestion}
+              >
+                <span>＋</span> Add your first question
+              </button>
+              <small>You can add as many questions as you need.</small>
+            </div>
+          ) : (
+            <>
+              <div className="questionnaire-list">
+                {questions.map((question, index) => (
+                  <article key={question.id} className="question-editor-card">
+                    <header className="question-editor-header">
+                      <div className="question-editor-heading">
+                        <span className="question-editor-number">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <div>
+                          <span className="question-editor-kicker">
+                            GUEST QUESTION
+                          </span>
+                          <h3>Question {index + 1}</h3>
+                        </div>
+                      </div>
 
-                <button
-                  type="button"
-                  className="question-remove-icon"
-                  onClick={() => removeQuestion(question.id)}
-                  aria-label="Remove question"
-                  title="Remove question"
-                >
-                  ×
-                </button>
-              </div>
-
-              <label className="question-field-label">
-                Your question
-                <input
-                  required
-                  className="question-text-input"
-                  value={question.text}
-                  onChange={(e) =>
-                    updateQuestion(question.id, {
-                      text: e.target.value,
-                    })
-                  }
-                  placeholder="e.g. What food do you prefer?"
-                />
-              </label>
-
-              <div className="question-settings">
-                <label className="question-field-label">
-                  Answer format
-                  <select
-                    value={question.type}
-                    onChange={(e) =>
-                      updateQuestion(question.id, {
-                        type: e.target.value as QuestionDraft["type"],
-                      })
-                    }
-                  >
-                    <option value="single_choice">Single choice</option>
-                    <option value="multiple_choice">Multiple choice</option>
-                  </select>
-                </label>
-
-                <div className="question-field-label">
-                  Guest response
-                  <div className="requirement-pills">
-                    <button
-                      type="button"
-                      className={`requirement-pill ${
-                        question.required ? "active" : ""
-                      }`}
-                      aria-pressed={question.required}
-                      onClick={() =>
-                        updateQuestion(question.id, { required: true })
-                      }
-                    >
-                      Required
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`requirement-pill ${
-                        !question.required ? "active" : ""
-                      }`}
-                      aria-pressed={!question.required}
-                      onClick={() =>
-                        updateQuestion(question.id, { required: false })
-                      }
-                    >
-                      Optional
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="question-options-section">
-                <div className="question-options-heading">
-                  <span>Answer options</span>
-                  <span>{question.options.length} options</span>
-                </div>
-
-                {question.options.map((option, optionIndex) => (
-                  <div key={optionIndex} className="question-option-row">
-                    <span className="question-option-dot" />
-
-                    <input
-                      required
-                      value={option}
-                      onChange={(e) =>
-                        updateOption(
-                          question.id,
-                          optionIndex,
-                          e.target.value
-                        )
-                      }
-                      placeholder={`Option ${optionIndex + 1}`}
-                    />
-
-                    {question.options.length > 2 && (
                       <button
                         type="button"
-                        className="question-option-remove"
-                        onClick={() =>
-                          removeOption(question.id, optionIndex)
-                        }
-                        aria-label={`Remove option ${optionIndex + 1}`}
+                        className="question-editor-delete"
+                        onClick={() => removeQuestion(question.id)}
+                        aria-label={`Remove question ${index + 1}`}
+                        title="Remove question"
                       >
-                        ×
+                        Remove <span>×</span>
                       </button>
-                    )}
-                  </div>
+                    </header>
+
+                    <div className="question-editor-content">
+                      <label className="question-editor-label">
+                        QUESTION
+                        <input
+                          required
+                          className="question-editor-input"
+                          value={question.text}
+                          onChange={(e) =>
+                            updateQuestion(question.id, {
+                              text: e.target.value,
+                            })
+                          }
+                          placeholder="e.g. What would you like to eat?"
+                        />
+                      </label>
+
+                      <div className="question-editor-settings">
+                        <label className="question-editor-label">
+                          ANSWER TYPE
+                          <select
+                            className="question-editor-select"
+                            value={question.type}
+                            onChange={(e) =>
+                              updateQuestion(question.id, {
+                                type: e.target.value as QuestionDraft["type"],
+                              })
+                            }
+                          >
+                            <option value="single_choice">Choose one</option>
+                            <option value="multiple_choice">
+                              Choose multiple
+                            </option>
+                          </select>
+                        </label>
+
+                        <div className="question-editor-label">
+                          RESPONSE REQUIREMENT
+                          <div className="question-editor-toggle">
+                            <button
+                              type="button"
+                              className={
+                                question.required
+                                  ? "question-editor-toggle-option selected"
+                                  : "question-editor-toggle-option"
+                              }
+                              aria-pressed={question.required}
+                              onClick={() =>
+                                updateQuestion(question.id, {
+                                  required: true,
+                                })
+                              }
+                            >
+                              Required
+                            </button>
+                            <button
+                              type="button"
+                              className={
+                                !question.required
+                                  ? "question-editor-toggle-option selected"
+                                  : "question-editor-toggle-option"
+                              }
+                              aria-pressed={!question.required}
+                              onClick={() =>
+                                updateQuestion(question.id, {
+                                  required: false,
+                                })
+                              }
+                            >
+                              Optional
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="question-editor-options">
+                        <div className="question-editor-options-heading">
+                          <div>
+                            <h4>Answer options</h4>
+                            <p>Add the choices your guests can select.</p>
+                          </div>
+                          <span>{question.options.length} choices</span>
+                        </div>
+
+                        <div className="question-editor-option-list">
+                          {question.options.map((option, optionIndex) => (
+                            <div
+                              key={optionIndex}
+                              className="question-editor-option"
+                            >
+                              <span
+                                className={
+                                  question.type === "multiple_choice"
+                                    ? "question-editor-choice multiple"
+                                    : "question-editor-choice"
+                                }
+                              />
+                              <input
+                                required
+                                value={option}
+                                onChange={(e) =>
+                                  updateOption(
+                                    question.id,
+                                    optionIndex,
+                                    e.target.value
+                                  )
+                                }
+                                placeholder={`Option ${optionIndex + 1}`}
+                                aria-label={`Question ${index + 1}, option ${
+                                  optionIndex + 1
+                                }`}
+                              />
+
+                              {question.options.length > 2 && (
+                                <button
+                                  type="button"
+                                  className="question-editor-option-delete"
+                                  onClick={() =>
+                                    removeOption(question.id, optionIndex)
+                                  }
+                                  aria-label={`Remove option ${
+                                    optionIndex + 1
+                                  }`}
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="question-editor-add-option"
+                          onClick={() => addOption(question.id)}
+                        >
+                          <span>＋</span> Add an answer option
+                        </button>
+                      </div>
+
+                      <footer className="question-editor-footer">
+                        <span>
+                          {question.required
+                            ? "Guests will need to answer this question."
+                            : "Guests can skip this question."}
+                        </span>
+                        <span>Question {index + 1}</span>
+                      </footer>
+                    </div>
+                  </article>
                 ))}
-
-                <button
-                  type="button"
-                  className="question-add-option"
-                  onClick={() => addOption(question.id)}
-                >
-                  + Add another option
-                </button>
               </div>
 
-              <div className="question-card-footer">
-                <span>
-                  {question.required
-                    ? "Guests must answer this question"
-                    : "Guests can skip this question"}
+              <button
+                type="button"
+                className="questionnaire-add-button"
+                onClick={addQuestion}
+              >
+                <span className="questionnaire-add-icon">＋</span>
+                <span className="questionnaire-add-copy">
+                  <strong>Add another question</strong>
+                  <small>Keep building your guest questionnaire</small>
                 </span>
-
-                <button
-                  type="button"
-                  className="question-remove-text"
-                  onClick={() => removeQuestion(question.id)}
-                >
-                  Remove question
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            className="question-add-main"
-            onClick={addQuestion}
-          >
-            <span className="question-add-symbol">+</span>
-            <span>
-              <strong>Add a question</strong>
-              <small>Create another question for your guests</small>
-            </span>
-          </button>
-        </div>
+                <span className="questionnaire-add-arrow">→</span>
+              </button>
+            </>
+          )}
+        </section>
 
         <button className="primary" disabled={busy}>
           {busy ? "Creating..." : "Create event ↗"}
