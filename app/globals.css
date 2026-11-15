@@ -259,7 +259,10 @@ textarea { min-height: 90px; resize: vertical; }
   .section-head p { margin-top: 15px; }
   .footer { gap: 12px; flex-wrap: wrap; }
   .nav { height: 70px; }
-  .nav-link { display: none; }
+  .nav-link {
+  display: inline-block;
+  font-size: 12px;
+}
   .form-shell, .invite { padding: 25px; margin-top: 35px; }
   h1 { letter-spacing: -2px; }
   .rsvp-attendee { padding: 15px; }
